@@ -282,6 +282,17 @@ def test_research_guard_routes_to_limited_report_when_budget_is_exhausted() -> N
     assert route_after_research_guard(state) == "finalize_limited_report"
 
 
+def test_finalize_limited_report_explains_zero_evidence_budget_exhaustion() -> None:
+    state = create_initial_state("测试")
+    state["research_round"] = 3
+
+    update = finalize_limited_report_node(state)
+
+    assert "未取得可引用的正式证据" in update["final_report"]
+    assert "调整研究问题" in update["final_report"]
+    assert update["trace"][0]["event"] == "limited_report_without_evidence"
+
+
 class FakeAssessmentModel:
     def invoke(self, messages: list[object]) -> EvidenceAssessmentOutput:
         assert len(messages) == 2

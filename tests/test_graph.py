@@ -124,3 +124,24 @@ def test_research_graph_runs_tool_evidence_assessment_and_report_path(monkeypatc
     assert ("agent", "node_completed") in node_events
     assert ("verify_report", "node_completed") in node_events
     assert ("store_memory", "node_completed") in node_events
+
+
+def test_research_graph_ends_safely_when_no_evidence_is_found(monkeypatch) -> None:
+    """零证据达到预算后应交付说明原因的受限结论，而不是在最终节点抛错。"""
+
+    def fake_agent(state):
+        return {"messages": [AIMessage(content="{}")]} 
+
+    def fake_recall_memory(state):
+        return {"recalled_memories": []}
+
+    monkeypatch.setattr(graph_module, "recall_memory_node", fake_recall_memory)
+    monkeypatch.setattr(graph_module, "agent_node", fake_agent)
+
+    result = graph_module.build_research_graph().invoke(create_initial_state("没有证据的测试"))
+
+    assert "研究受限结论" in result["final_report"]
+    assert "未取得可引用的正式证据" in result["final_report"]
+    assert any(
+        entry["event"] == "limited_report_without_evidence" for entry in result["trace"]
+    )

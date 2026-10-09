@@ -1092,26 +1092,49 @@ def store_memory_node(state: ResearchState) -> dict[str, list[TraceEntry]]:
     }
 
 
-def finalize_limited_report_node(state: ResearchState) -> dict[str, Any]:
-    """修订预算耗尽仍未通过核验时，不交付可能失真的草稿。"""
+def _limited_report(reason: str, next_step: str, state: ResearchState) -> str:
+    """生成所有安全降级路径共用的受限报告骨架。"""
 
-    review = state.get("report_review")
-    if not review or review.get("verdict") != "revise":
-        raise ValueError("finalize_limited_report 需要未通过的 report_review。")
-    final_report = (
+    return (
         "# 研究受限结论\n\n"
-        "本次报告草稿在受控修订后仍存在无法自动消除的证据支持或引用问题。"
-        "为避免把未经核验的主张作为研究结论交付，系统不输出该草稿；"
-        "建议补充资料后重新研究，或由人工复核。\n\n"
+        f"本次无法交付完整研究结论：{reason}\n\n"
+        f"建议：{next_step}\n\n"
         + _reference_section(_numbered_evidence(state))
     )
+
+
+def finalize_limited_report_node(state: ResearchState) -> dict[str, Any]:
+    """按失败原因安全结束：零证据耗尽，或草稿核验/修订后仍不合格。"""
+
+    review = state.get("report_review")
+    # 已进入报告核验阶段时，优先说明“为什么拒绝交付草稿”；零证据路径不会产生
+    # report_review，因此只在没有这份审查结论时处理。
+    if review and review.get("verdict") == "revise":
+        final_report = _limited_report(
+            "报告草稿在受控修订后仍存在无法自动消除的证据支持或引用问题。",
+            "请补充资料后重新研究，或由人工复核；系统不输出该草稿，避免交付未经核验的结论。",
+            state,
+        )
+        event = "report_withheld_after_failed_review"
+        detail = "修订预算耗尽后仍未通过核验，已阻止交付未验证草稿。"
+    elif not state.get("evidence"):
+        final_report = _limited_report(
+            "在允许的研究轮次和工具调用预算内，系统未取得可引用的正式证据。",
+            "请调整研究问题、补充更具体的地点或时间，或稍后在资料源恢复后重新研究。",
+            state,
+        )
+        event = "limited_report_without_evidence"
+        detail = "研究预算耗尽且没有正式证据，已交付说明原因的受限结论。"
+    else:
+        raise ValueError("finalize_limited_report 只处理零证据耗尽或未通过核验的草稿。")
+
     return {
         "final_report": final_report,
         "trace": [
             {
                 "node": "finalize_limited_report",
-                "event": "report_withheld_after_failed_review",
-                "detail": "修订预算耗尽后仍未通过核验，已阻止交付未验证草稿。",
+                "event": event,
+                "detail": detail,
             }
         ],
     }
