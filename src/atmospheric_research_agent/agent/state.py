@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from operator import add
 from typing import Annotated, Literal
+from uuid import uuid4
 
 from typing_extensions import TypedDict
 
@@ -49,12 +51,47 @@ class EvidenceAssessment(TypedDict, total=False):
     reason: str
 
 
+class ReportReview(TypedDict, total=False):
+    """对报告草稿的结构化 Reflection / Verification 结果。
+
+    Reflection 负责发现报告可能写得过头、遗漏限定或偏离问题的地方；
+    Verification 则要求这些判断必须逐项对照已正式记录的 evidence。它不保存
+    模型的隐藏推理，只保存后续修订节点能执行、用户也能审查的结论。
+    """
+
+    verdict: Literal["pass", "revise"]
+    supported_points: list[str]
+    unsupported_or_overstated_claims: list[str]
+    citation_issues: list[str]
+    required_changes: list[str]
+    reason: str
+
+
+class ProjectMemoryRecord(TypedDict, total=False):
+    """跨运行保存的一张研究资料卡，只作背景，不作本轮 evidence。"""
+
+    memory_id: str
+    question: str
+    summary: str
+    source_locations: list[str]
+    created_at: str
+    status: Literal["verified_report"]
+
+
 class TraceEntry(TypedDict, total=False):
-    """面向调试与复盘的简短运行记录。"""
+    """一次运行中的结构化事件。
+
+    ``event`` 说明发生了什么；``node`` 标明发生在哪个图节点；``timestamp``
+    让事件可以按时间复盘。自动生成的节点生命周期事件还会携带
+    ``duration_ms``。所有事件通过同一个 ``run_id`` 归属于一次用户请求。
+    """
 
     node: str
     event: str
     detail: str
+    timestamp: str
+    status: Literal["started", "success"]
+    duration_ms: float
 
 
 class ResearchState(TypedDict, total=False):
@@ -69,11 +106,22 @@ class ResearchState(TypedDict, total=False):
     # 用户输入：在开始一次新研究任务时必须提供。
     question: str
 
+    # 一次 invoke 的关联标识。未来写入日志、数据库或监控平台时，可用它把同一
+    # 用户请求的所有事件、错误与指标重新串起来。
+    run_id: str
+    started_at: str
+    finished_at: str | None
+    run_duration_ms: float | None
+
     # Tool Calling 协议消息。每个 Agent 或工具节点只追加本轮新增消息。
     messages: Annotated[list[BaseMessage], add]
 
     # Agent 逐步更新的研究意图与当前方向。
     research_plan: ResearchPlan
+
+    # START 后固定读取的历史研究摘要。它不使用 evidence reducer，避免被误认为
+    # 本次可引用的正式资料。
+    recalled_memories: list[ProjectMemoryRecord]
 
     # record_results 节点从工具结果中整理出的正式证据。
     evidence: Annotated[list[EvidenceRecord], add]
@@ -91,6 +139,12 @@ class ResearchState(TypedDict, total=False):
     # generate_report 节点产出的完整或受限结论报告。
     final_report: str | None
 
+    # V2：报告先作为草稿接受 Reflection / Verification；只有通过检查或完成
+    # 受控修订后，finalize_report 才把它写入 final_report。
+    draft_report: str | None
+    report_review: ReportReview
+    report_revision_count: int
+
     # 保留简短轨迹，供调试、学习和后续可观测性扩展使用。
     trace: Annotated[list[TraceEntry], add]
 
@@ -106,13 +160,30 @@ def create_initial_state(question: str) -> ResearchState:
     if not clean_question:
         raise ValueError("研究问题不能为空。")
 
+    started_at = datetime.now(UTC).isoformat()
+    run_id = str(uuid4())
     return {
         "question": clean_question,
+        "run_id": run_id,
+        "started_at": started_at,
+        "finished_at": None,
+        "run_duration_ms": None,
         "messages": [],
+        "recalled_memories": [],
         "evidence": [],
         "research_round": 0,
         "tool_call_count": 0,
         "clarification_question": None,
         "final_report": None,
-        "trace": [],
+        "draft_report": None,
+        "report_revision_count": 0,
+        "trace": [
+            {
+                "node": "run",
+                "event": "run_started",
+                "detail": "已创建本次研究任务，等待进入 LangGraph。",
+                "timestamp": started_at,
+                "status": "started",
+            }
+        ],
     }

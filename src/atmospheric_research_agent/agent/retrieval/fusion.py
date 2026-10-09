@@ -17,6 +17,9 @@ def reciprocal_rank_fusion(
 
     RRF(candidate) = Σ 1 / (rank_constant + 该候选在某一路的名次)
     它只比较名次；向量距离和 BM25 原始分数仍保留在结果中，但不会直接相加。
+    向量的 cosine distance 和 BM25 的分数是两套完全不同量纲的数字（一个在0~2之间，一个理论上无上限），
+    直接相加是没有意义的，RRF 的设计初衷正是为了绕开"不同检索方式分数无法直接比较"这个问题，
+    只利用排名顺序这个共同的、可比的维度。
     """
 
     if rank_constant < 1:

@@ -1,0 +1,124 @@
+[
+  {
+    "id": "subtropical_high_semantic_mechanism",
+    "question": "为什么副热带高压控制期间天气常表现为晴热少雨？",
+    "category": "semantic_paraphrase",
+    "expected_sources": [
+      {"location": "03_大气动力学与环流/22_副热带高压及其天气影响.md", "section": "形成机制"},
+      {"location": "03_大气动力学与环流/22_副热带高压及其天气影响.md", "section": "影响与表现"}
+    ],
+    "note": "问题未直接复用资料标题；需要同时召回副高的环流背景和其对云雨、晴热的影响。"
+  },
+  {
+    "id": "high_pressure_boundary",
+    "question": "高压系统一出现，就一定意味着高温干旱吗？",
+    "category": "boundary_condition",
+    "expected_sources": [
+      {"location": "03_大气动力学与环流/22_副热带高压及其天气影响.md", "section": "适用条件与局限性"},
+      {"location": "04_天气系统与中高纬过程/25_高压_低压与地面天气图.md", "section": "适用条件与局限性"}
+    ],
+    "note": "评测结论边界类问题，相关资料应明确说明高压不是天气保证。"
+  },
+  {
+    "id": "low_level_jet_heavy_rain",
+    "question": "850 hPa 低空急流与暴雨有什么关系？",
+    "category": "exact_term_and_multimechanism",
+    "expected_sources": [
+      {"location": "03_大气动力学与环流/23_低空急流与强降水.md", "section": "形成机制"},
+      {"location": "03_大气动力学与环流/23_低空急流与强降水.md", "section": "影响与表现"},
+      {"location": "03_大气动力学与环流/23_低空急流与强降水.md", "section": "适用条件与局限性"}
+    ],
+    "note": "新增专题资料后，系统应能召回 850 hPa 诊断、水汽输送/抬升路径与非充分条件的边界说明。"
+  },
+  {
+    "id": "heavy_rain_ingredients",
+    "question": "发生暴雨时，水汽、抬升和对流组织分别起到什么作用？",
+    "category": "multimechanism",
+    "expected_sources": [
+      {"location": "07_典型气象灾害/42_暴雨与短时强降水.md", "section": "形成机制"},
+      {"location": "02_云_降水与对流/09_对流触发条件与发展.md", "section": "形成机制"},
+      {"location": "02_云_降水与对流/11_中尺度对流系统.md", "section": "形成机制"}
+    ],
+    "note": "评测跨多个资料的机制覆盖能力，而不是只命中“暴雨”标题。"
+  },
+  {
+    "id": "convergence_divergence_lift",
+    "question": "高层辐散和低层辐合为什么有利于云雨发展？",
+    "category": "semantic_paraphrase",
+    "expected_sources": [
+      {"location": "03_大气动力学与环流/17_散度_涡度与垂直运动.md", "section": "形成机制"},
+      {"location": "03_大气动力学与环流/17_散度_涡度与垂直运动.md", "section": "影响与表现"}
+    ],
+    "note": "评测动力诊断术语与云雨影响之间的关联。"
+  },
+  {
+    "id": "enso_remote_influence",
+    "question": "热带太平洋海温和信风的异常，为什么会影响其他地区的降水？",
+    "category": "semantic_paraphrase",
+    "expected_sources": [
+      {"location": "06_气候系统与气候变化/39_ENSO.md", "section": "形成机制"},
+      {"location": "06_气候系统与气候变化/39_ENSO.md", "section": "影响与表现"}
+    ],
+    "note": "问题不直接写 ENSO，评测向量语义召回对术语省略的贡献。"
+  },
+  {
+    "id": "mjo_tropical_modulation",
+    "question": "热带中有一个数十天尺度、向东传播的对流异常，它会如何影响季风和热带气旋环境？",
+    "category": "semantic_paraphrase",
+    "expected_sources": [
+      {"location": "05_热带天气系统/35_马登_朱利安振荡.md", "section": "定义与背景"},
+      {"location": "05_热带天气系统/35_马登_朱利安振荡.md", "section": "影响与表现"}
+    ],
+    "note": "不出现 MJO 缩写，评测语义改写检索。"
+  },
+  {
+    "id": "atmospheric_river_orographic_rain",
+    "question": "一条狭长的水汽输送带到达地形附近后，为何容易出现强降水？",
+    "category": "semantic_paraphrase",
+    "expected_sources": [
+      {"location": "04_天气系统与中高纬过程/31_大气河.md", "section": "形成机制"},
+      {"location": "04_天气系统与中高纬过程/31_大气河.md", "section": "适用条件与局限性"}
+    ],
+    "note": "评测对“大气河”这一未显式出现的概念及其地形抬升机制的召回。"
+  },
+  {
+    "id": "nighttime_radiation_fog",
+    "question": "夜间地面冷却后，近地面空气为什么可能形成雾？",
+    "category": "mechanism",
+    "expected_sources": [
+      {"location": "02_云_降水与对流/13_雾_低云与能见度.md", "section": "形成机制"}
+    ],
+    "note": "评测较短机制问题的首条精度。"
+  },
+  {
+    "id": "radar_echo_limit",
+    "question": "雷达回波很强，是否等于地面一定下了同等强度的雨？",
+    "category": "boundary_condition",
+    "expected_sources": [
+      {"location": "08_观测_预报与不确定性/47_天气雷达观测.md", "section": "适用条件与局限性"},
+      {"location": "08_观测_预报与不确定性/47_天气雷达观测.md", "section": "影响与表现"}
+    ],
+    "note": "评测观测资料的适用边界，而不是只检索定义。"
+  },
+  {
+    "id": "ensemble_uncertainty",
+    "question": "为什么集合预报常给出概率而不是一个确定答案？短临预报又主要依赖什么？",
+    "category": "multimechanism_and_boundary",
+    "expected_sources": [
+      {"location": "08_观测_预报与不确定性/50_集合预报_临近预报与预报不确定性.md", "section": "形成机制"},
+      {"location": "08_观测_预报与不确定性/50_集合预报_临近预报与预报不确定性.md", "section": "影响与表现"},
+      {"location": "08_观测_预报与不确定性/50_集合预报_临近预报与预报不确定性.md", "section": "适用条件与局限性"}
+    ],
+    "note": "评测同一主题内多个章节的覆盖能力。"
+  },
+  {
+    "id": "unstable_air_not_sufficient",
+    "question": "空气不稳定是不是就一定会出现强对流？",
+    "category": "boundary_condition",
+    "expected_sources": [
+      {"location": "02_云_降水与对流/09_对流触发条件与发展.md", "section": "适用条件与局限性"},
+      {"location": "01_基础大气与热力学/06_大气稳定度与直减率.md", "section": "适用条件与局限性"}
+    ],
+    "note": "评测系统是否优先找到“不充分条件”的限制性证据。"
+  }
+]

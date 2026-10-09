@@ -11,10 +11,14 @@ from atmospheric_research_agent.agent.nodes import (
     assess_evidence_with_model,
     execute_tool_calls,
     generate_report_with_model,
+    generate_draft_with_model,
     parse_no_tool_decision,
     record_results_node,
     _reference_section,
     request_clarification_node,
+    revise_report_with_model,
+    finalize_limited_report_node,
+    finalize_report_node,
     research_guard_node,
     route_after_agent,
     route_after_evidence_assessment,
@@ -275,7 +279,7 @@ def test_research_guard_routes_to_limited_report_when_budget_is_exhausted() -> N
     state.update(research_guard_node(state))
 
     assert state["research_round"] == 3
-    assert route_after_research_guard(state) == "generate_report"
+    assert route_after_research_guard(state) == "finalize_limited_report"
 
 
 class FakeAssessmentModel:
@@ -319,7 +323,7 @@ def test_route_after_evidence_assessment_respects_structured_decision() -> None:
         "reason": "证据充分。",
     }
 
-    assert route_after_evidence_assessment(state) == "generate_report"
+    assert route_after_evidence_assessment(state) == "generate_draft"
 
 
 class FakeReportModel:
@@ -381,6 +385,51 @@ def test_generate_report_without_evidence_does_not_call_model() -> None:
     assert "未取得可引用的正式证据" in update["final_report"]
 
 
+def test_draft_revision_and_finalization_are_separate_steps() -> None:
+    state = create_initial_state("副热带高压有什么影响？")
+    state["evidence"] = [
+        {
+            "evidence_id": "evidence_1",
+            "content": "下沉运动常抑制云雨。",
+            "source_display_name": "知识库：副热带高压 > 影响",
+            "source_location": "03_环流/副热带高压.md",
+        }
+    ]
+    state["assessment"] = {
+        "sufficient": True,
+        "next_step": "full_report",
+    }
+
+    draft_update = generate_draft_with_model(state, FakeReportModel())
+    assert "draft_report" in draft_update
+    assert "final_report" not in draft_update
+    state.update(draft_update)
+    state["report_review"] = {
+        "verdict": "revise",
+        "required_changes": ["删去无证据的绝对化措辞"],
+    }
+
+    revised_update = revise_report_with_model(state, FakeReportModel())
+    assert revised_update["report_revision_count"] == 1
+    state.update(revised_update)
+    state["report_review"] = {"verdict": "pass"}
+
+    final_update = finalize_report_node(state)
+    assert "下沉运动可抑制云雨。[E1]" in final_update["final_report"]
+    assert "## 资料来源" in final_update["final_report"]
+
+
+def test_limited_finalization_withholds_unverified_draft() -> None:
+    state = create_initial_state("测试")
+    state["draft_report"] = "不应交付的草稿。"
+    state["report_review"] = {"verdict": "revise"}
+
+    update = finalize_limited_report_node(state)
+
+    assert "不输出该草稿" in update["final_report"]
+    assert "不应交付的草稿" not in update["final_report"]
+
+
 def test_request_clarification_records_waiting_state() -> None:
     state = create_initial_state("北京现在天气如何？")
     state["clarification_question"] = "请提供你想查询的具体地点。"
@@ -431,7 +480,7 @@ def test_route_after_agent_blocks_tool_calls_that_exceed_budget() -> None:
         )
     ]
 
-    assert route_after_agent(state) == "generate_report"
+    assert route_after_agent(state) == "research_guard"
 
 
 def test_route_after_agent_blocks_tool_calls_after_research_round_limit() -> None:
@@ -444,7 +493,7 @@ def test_route_after_agent_blocks_tool_calls_after_research_round_limit() -> Non
         )
     ]
 
-    assert route_after_agent(state) == "generate_report"
+    assert route_after_agent(state) == "research_guard"
 
 
 def test_agent_node_degrades_empty_no_tool_response_to_guard_path(monkeypatch) -> None:

@@ -1,10 +1,13 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-tmp/
 .venv/
 *.egg-info/
 data/vector_store/
 data/retrieval_store/
+data/runtime_memory/
+evals/results/
 .env
 .env.*
 !.env.example

@@ -14,13 +14,19 @@ def test_research_graph_compiles_with_all_expected_nodes() -> None:
     assert {
         "__start__",
         "__end__",
+        "recall_memory",
         "agent",
         "tools",
         "record_results",
         "research_guard",
         "assess_evidence",
-        "generate_report",
+        "generate_draft",
+        "verify_report",
+        "revise_report",
+        "finalize_report",
+        "finalize_limited_report",
         "request_clarification",
+        "store_memory",
     }.issubset(node_names)
 
 
@@ -82,13 +88,29 @@ def test_research_graph_runs_tool_evidence_assessment_and_report_path(monkeypatc
             }
         }
 
-    def fake_report(state):
+    def fake_draft(state):
+        return {"draft_report": "# 测试报告草稿\n\n引用 [E1]。"}
+
+    def fake_verify(state):
+        return {"report_review": {"verdict": "pass", "reason": "测试通过。"}}
+
+    def fake_finalize(state):
         return {"final_report": "# 测试报告\n\n引用 [E1]。"}
 
+    def fake_recall_memory(state):
+        return {"recalled_memories": []}
+
+    def fake_store_memory(state):
+        return {"trace": [{"node": "store_memory", "event": "memory_stored", "detail": "测试保存。"}]}
+
+    monkeypatch.setattr(graph_module, "recall_memory_node", fake_recall_memory)
     monkeypatch.setattr(graph_module, "agent_node", fake_agent)
     monkeypatch.setattr(graph_module, "tools_node", fake_tools)
     monkeypatch.setattr(graph_module, "assess_evidence_node", fake_assessment)
-    monkeypatch.setattr(graph_module, "generate_report_node", fake_report)
+    monkeypatch.setattr(graph_module, "generate_draft_node", fake_draft)
+    monkeypatch.setattr(graph_module, "verify_report_node", fake_verify)
+    monkeypatch.setattr(graph_module, "finalize_report_node", fake_finalize)
+    monkeypatch.setattr(graph_module, "store_memory_node", fake_store_memory)
 
     result = graph_module.build_research_graph().invoke(create_initial_state("测试问题"))
 
@@ -97,3 +119,8 @@ def test_research_graph_runs_tool_evidence_assessment_and_report_path(monkeypatc
     assert result["research_round"] == 1
     assert len(result["evidence"]) == 1
     assert result["assessment"]["sufficient"] is True
+    node_events = [(entry["node"], entry["event"]) for entry in result["trace"]]
+    assert ("agent", "node_started") in node_events
+    assert ("agent", "node_completed") in node_events
+    assert ("verify_report", "node_completed") in node_events
+    assert ("store_memory", "node_completed") in node_events

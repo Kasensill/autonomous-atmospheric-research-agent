@@ -1,0 +1,92 @@
+[
+  {
+    "id": "supported_qualified_claim",
+    "category": "supported_claim",
+    "question": "副热带高压为什么常带来高温少雨？",
+    "evidence": [
+      {
+        "evidence_id": "verification_e1",
+        "content": "高压控制区下沉运动常抑制云雨并促进晴热；其边缘可与暖湿气流、低空急流和扰动配合，形成降水带。",
+        "source_display_name": "知识库：副热带高压 > 影响与表现",
+        "source_location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "source_type": "local_knowledge",
+        "tool_name": "search_local_knowledge"
+      }
+    ],
+    "draft_report": "# 结论\n\n副热带高压主体控制区通常有利于晴热少雨，因为下沉运动常抑制云雨并促进晴热；但边缘仍可能形成降水带 [E1]。",
+    "expected_verdict": "pass",
+    "note": "合格案例：主张有证据、使用通常性表述，并保留边缘例外。"
+  },
+  {
+    "id": "absolute_overstatement",
+    "category": "overstatement",
+    "question": "副热带高压为什么常带来高温少雨？",
+    "evidence": [
+      {
+        "evidence_id": "verification_e1",
+        "content": "高压控制区下沉运动常抑制云雨并促进晴热；其边缘可与暖湿气流、低空急流和扰动配合，形成降水带。",
+        "source_display_name": "知识库：副热带高压 > 影响与表现",
+        "source_location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "source_type": "local_knowledge",
+        "tool_name": "search_local_knowledge"
+      }
+    ],
+    "draft_report": "# 结论\n\n只要出现副热带高压，任何地区都必然高温干旱 [E1]。",
+    "expected_verdict": "revise",
+    "note": "语义核验案例：资料只说常见倾向且明确存在边缘降水，草稿却写成无条件必然。"
+  },
+  {
+    "id": "missing_citation",
+    "category": "citation_missing",
+    "question": "副热带高压为什么常带来高温少雨？",
+    "evidence": [
+      {
+        "evidence_id": "verification_e1",
+        "content": "高压控制区下沉运动常抑制云雨并促进晴热。",
+        "source_display_name": "知识库：副热带高压 > 影响与表现",
+        "source_location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "source_type": "local_knowledge",
+        "tool_name": "search_local_knowledge"
+      }
+    ],
+    "draft_report": "# 结论\n\n副热带高压控制区的下沉运动常抑制云雨并促进晴热。",
+    "expected_verdict": "revise",
+    "note": "程序硬规则案例：有正式证据的事实性结论却没有任何 [E#]。"
+  },
+  {
+    "id": "nonexistent_citation",
+    "category": "citation_invalid",
+    "question": "副热带高压为什么常带来高温少雨？",
+    "evidence": [
+      {
+        "evidence_id": "verification_e1",
+        "content": "高压控制区下沉运动常抑制云雨并促进晴热。",
+        "source_display_name": "知识库：副热带高压 > 影响与表现",
+        "source_location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "source_type": "local_knowledge",
+        "tool_name": "search_local_knowledge"
+      }
+    ],
+    "draft_report": "# 结论\n\n副热带高压控制区的下沉运动常抑制云雨并促进晴热 [E99]。",
+    "expected_verdict": "revise",
+    "note": "程序硬规则案例：草稿引用了本轮不存在的 E99。"
+  },
+  {
+    "id": "claim_evidence_mismatch",
+    "category": "citation_semantic_mismatch",
+    "question": "副热带高压为什么常带来高温少雨？",
+    "evidence": [
+      {
+        "evidence_id": "verification_e1",
+        "content": "高压控制区下沉运动常抑制云雨并促进晴热。",
+        "source_display_name": "知识库：副热带高压 > 影响与表现",
+        "source_location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "source_type": "local_knowledge",
+        "tool_name": "search_local_knowledge"
+      }
+    ],
+    "draft_report": "# 结论\n\n副热带高压会使全球海平面上升 1 米 [E1]。",
+    "expected_verdict": "revise",
+    "note": "语义核验案例：引用编号真实存在，但该资料根本不支持海平面上升主张。"
+  }
+]
