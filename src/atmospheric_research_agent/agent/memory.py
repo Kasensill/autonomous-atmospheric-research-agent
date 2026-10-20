@@ -6,7 +6,7 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from .settings import (MAX_MEMORY_EXCERPT_CHARACTERS, MEMORY_RECALL_LIMIT,
@@ -91,6 +91,7 @@ def make_memory_record(
     question: str,
     final_report: str,
     evidence: list[EvidenceRecord],
+    report_mode: Literal["full", "limited"] = "full",
 ) -> ProjectMemoryRecord:
     """将已核验完成的研究压缩为一张项目资料卡。"""
 
@@ -108,6 +109,7 @@ def make_memory_record(
         "source_locations": sources,
         "created_at": _utc_now(),
         "status": "verified_report",
+        "report_mode": report_mode,
         "time_sensitive": any(item.get("source_type") == "weather" for item in evidence)
             or is_time_sensitive_question(question),
     }

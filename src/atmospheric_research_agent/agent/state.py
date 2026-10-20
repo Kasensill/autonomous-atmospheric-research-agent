@@ -111,6 +111,8 @@ class ProjectMemoryRecord(TypedDict, total=False):
     created_at: str
     # 当前只允许保存已通过 Verification 的报告，避免错误草稿污染长期记忆。
     status: Literal["verified_report"]
+    # 区分完整报告与通过核验但证据不全的受限报告；不改变核验状态。
+    report_mode: Literal["full", "limited"]
     # 时效性快照不能作为长期背景自动召回；旧记录同时按问题和来源识别。
     time_sensitive: bool
 
@@ -205,6 +207,8 @@ class ResearchState(TypedDict, total=False):
 
     # Report Writer 生成、但尚未交付的 Markdown 草稿。
     draft_report: str | None
+    # 生成草稿时确定的交付模式；受限提示只在定稿时由程序添加。
+    report_mode: Literal["full", "limited"]
     # Report Verification 对当前 draft_report 的结构化审查结果。
     report_review: ReportReview
     # 当前草稿已经受控修订过几次；用于限制“修订 → 再核验”循环。

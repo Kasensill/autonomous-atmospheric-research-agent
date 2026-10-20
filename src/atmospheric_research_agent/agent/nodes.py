@@ -203,7 +203,12 @@ def _messages_for_model(state: ResearchState) -> list[BaseMessage]:
                                   "\n优先补缺口；已查过的同义查询不要无理由重复。当前天气缺失或过期时重新查询。"))
     recalled_memories = state.get("recalled_memories", [])
     if recalled_memories:
-        memory_json = json.dumps(recalled_memories, ensure_ascii=False, indent=2)
+        memory_context = [
+            {**record, "summary": "证据不全，仅作线索，不可当作结论。\n" + record.get("summary", "")}
+            if record.get("report_mode") == "limited" else record
+            for record in recalled_memories
+        ]
+        memory_json = json.dumps(memory_context, ensure_ascii=False, indent=2)
         messages.append(
             SystemMessage(
                 content=(
@@ -1046,6 +1051,7 @@ def generate_draft_with_model(state: ResearchState, model: Any) -> dict[str, Any
         raise ValueError("报告草稿模型返回了空文本。")
     return {
         "draft_report": draft_report,
+        "report_mode": mode,
         "trace": [
             {
                 "node": "generate_draft",
@@ -1136,6 +1142,11 @@ def finalize_report_node(state: ResearchState) -> dict[str, Any]:
     if not review or review.get("verdict") != "pass":
         raise ValueError("finalize_report 只能定稿 verdict=pass 的报告。")
     final_report = f"{draft_report.strip()}\n\n{_reference_section(_numbered_evidence(state), report=draft_report)}"
+    if state.get("report_mode", _report_mode(state)) == "limited":
+        final_report = (
+            "> 受限报告：当前证据不全，本报告仅包含被证据支持的部分；未解决问题见正文。\n\n"
+            + final_report
+        )
     return {
         "final_report": final_report,
         "trace": [
@@ -1158,15 +1169,16 @@ def store_memory_node(state: ResearchState) -> dict[str, list[TraceEntry]]:
     if not review or review.get("verdict") != "pass":
         raise ValueError("store_memory 只能保存已通过 Verification 的报告。")
 
-    if (_report_mode(state) != "full" or is_time_sensitive_question(_task_question(state))
+    if (is_time_sensitive_question(_task_question(state))
             or any(item.get("source_type") == "weather" for item in state.get("evidence", []))):
         return {"trace": [{"node": "store_memory", "event": "memory_skipped",
-                           "detail": "受限报告或时效性天气任务不写入长期项目记忆；任务结果仍正常交付。"}]}
+                           "detail": "时效性天气任务不写入长期项目记忆；任务结果仍正常交付。"}]}
 
     record = make_memory_record(
         question=_task_question(state),
         final_report=final_report,
         evidence=state.get("evidence", []),
+        report_mode=state.get("report_mode", _report_mode(state)),
     )
     save_project_memory(record)
     return {

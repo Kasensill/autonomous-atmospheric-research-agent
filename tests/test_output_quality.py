@@ -71,13 +71,12 @@ def test_brief_report_cannot_pass_length_rule_even_if_model_passes():
     assert any("900" in change for change in review["required_changes"])
 
 
-def test_weather_and_limited_reports_skip_memory(monkeypatch):
+def test_weather_reports_skip_memory(monkeypatch):
     def unexpected(record):
         raise AssertionError("不应写入")
     monkeypatch.setattr(nodes, "save_project_memory", unexpected)
     for question, evidence, assessment in [
         ("当前天气", [], {"sufficient": True, "next_step": "full_report"}),
-        ("机制", [], {"sufficient": False, "next_step": "limited_report"}),
         ("机制", [{"source_type": "weather"}], {"sufficient": True, "next_step": "full_report"}),
     ]:
         state = create_initial_state(question)
