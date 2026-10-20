@@ -179,6 +179,8 @@ class ResearchState(TypedDict, total=False):
 
     # Agent 逐步更新的研究意图与当前方向；它是计划，不是已经获得的事实。
     research_plan: ResearchPlan
+    # 成功解析并写入计划时的 research_round 快照；由程序记录，不要求模型输出。
+    research_plan_round: int
 
     # START 后固定读取的历史研究摘要。它不使用 evidence reducer，避免被误认为
     # 本次可引用的正式资料。
