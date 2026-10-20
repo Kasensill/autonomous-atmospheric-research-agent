@@ -15,6 +15,10 @@ MAX_REPORT_REVISION_ROUNDS = 1
 # V2.1 项目记忆：只召回少量相关、已核验报告摘要；不是本次报告的正式证据。
 MEMORY_RECALL_LIMIT = 3
 MAX_MEMORY_EXCERPT_CHARACTERS = 1_200
+MEMORY_MIN_OVERLAP_TERMS = 3
+MEMORY_MIN_QUERY_COVERAGE = 0.15
+# 简要报告正文的机械长度上限（含 Markdown，不含程序附加的资料来源）。
+BRIEF_REPORT_MAX_CHARACTERS = 900
 
 # 工具运行参数：这些不会暴露给模型，但可以在一个位置统一调整。
 LOCAL_KNOWLEDGE_TOP_K = 4

@@ -107,6 +107,8 @@ class ProjectMemoryRecord(TypedDict, total=False):
     created_at: str
     # 当前只允许保存已通过 Verification 的报告，避免错误草稿污染长期记忆。
     status: Literal["verified_report"]
+    # 时效性快照不能作为长期背景自动召回；旧记录同时按问题和来源识别。
+    time_sensitive: bool
 
 
 class TraceEntry(TypedDict, total=False):
@@ -129,6 +131,16 @@ class TraceEntry(TypedDict, total=False):
     status: Literal["started", "success"]
     # 节点或整次运行的耗时，单位毫秒；只有完成事件才有。
     duration_ms: float
+    # 可选的工具与路由诊断；只记录允许展示的参数，不写密钥或完整工具正文。
+    tool_calls: list[dict]
+    tool_name: str
+    returned_count: int
+    accepted_count: int
+    duplicate_count: int
+    destination: str
+    research_round: int
+    tool_call_count: int
+    tool_call_limit: int
 
 
 class ResearchState(TypedDict, total=False):

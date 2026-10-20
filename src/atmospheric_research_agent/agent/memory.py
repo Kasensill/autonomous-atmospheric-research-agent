@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from .settings import MAX_MEMORY_EXCERPT_CHARACTERS, MEMORY_RECALL_LIMIT
+from .settings import (MAX_MEMORY_EXCERPT_CHARACTERS, MEMORY_RECALL_LIMIT,
+                       MEMORY_MIN_OVERLAP_TERMS, MEMORY_MIN_QUERY_COVERAGE)
 from .state import EvidenceRecord, ProjectMemoryRecord
 
 
@@ -28,7 +29,21 @@ def _memory_terms(text: str) -> set[str]:
     words = set(re.findall(r"[a-z0-9_]{2,}", normalized))
     chinese = "".join(re.findall(r"[\u4e00-\u9fff]", normalized))
     bigrams = {chinese[index : index + 2] for index in range(max(0, len(chinese) - 1))}
-    return words | bigrams
+    return (words | bigrams) - {"天气", "当前", "现在", "分析", "报告", "研究", "来源", "简要", "请查", "查询"}
+
+
+def is_time_sensitive_question(question: str) -> bool:
+    """保守识别当前天气快照；不能证明未命中的问题一定具有长期价值。"""
+    return any(term in question.lower() for term in ("当前", "现在", "实时", "今天", "今日", "此刻", "current weather", "weather now"))
+
+
+def reusable_memory(record: ProjectMemoryRecord) -> bool:
+    """旧格式记录也检查天气来源，防止此前保存的快照再次被召回。"""
+    return not (
+        record.get("time_sensitive")
+        or is_time_sensitive_question(record.get("question", ""))
+        or any("api.open-meteo.com" in str(url) for url in record.get("source_locations", []))
+    )
 
 
 def load_project_memory(*, store_path: Path = DEFAULT_MEMORY_PATH) -> list[ProjectMemoryRecord]:
@@ -53,9 +68,11 @@ def recall_project_memory(
     question_terms = _memory_terms(question)
     scored: list[tuple[int, str, ProjectMemoryRecord]] = []
     for record in load_project_memory(store_path=store_path):
+        if not reusable_memory(record):
+            continue
         record_text = f"{record.get('question', '')}\n{record.get('summary', '')}"
         overlap = len(question_terms & _memory_terms(record_text))
-        if overlap:
+        if overlap >= MEMORY_MIN_OVERLAP_TERMS and overlap / max(1, len(question_terms)) >= MEMORY_MIN_QUERY_COVERAGE:
             scored.append((overlap, record.get("created_at", ""), record))
     scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [record for _, _, record in scored[:limit]]
@@ -91,6 +108,8 @@ def make_memory_record(
         "source_locations": sources,
         "created_at": _utc_now(),
         "status": "verified_report",
+        "time_sensitive": any(item.get("source_type") == "weather" for item in evidence)
+            or is_time_sensitive_question(question),
     }
 
 

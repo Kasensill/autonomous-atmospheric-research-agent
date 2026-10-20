@@ -71,7 +71,9 @@ def _weather_evidence_text(location: dict[str, Any], current: dict[str, Any], ti
         f"{timezone}）在 {current.get('time', '未提供时间')} 的气温为 "
         f"{current.get('temperature_2m')}°C，体感温度 {current.get('apparent_temperature')}°C，"
         f"相对湿度 {current.get('relative_humidity_2m')}%，天气为{condition}，"
-        f"降水量 {current.get('precipitation')} mm，10 米风速 {current.get('wind_speed_10m')} km/h。"
+        f"降水量 {current.get('precipitation')} mm，10 米风速 {current.get('wind_speed_10m')} km/h，"
+        f"云量 {current.get('cloud_cover', '未提供')}%，"
+        f"10 米风向 {current.get('wind_direction_10m', '未提供')}°（气象风向）。"
     )
 
 

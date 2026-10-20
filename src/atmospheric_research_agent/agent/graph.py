@@ -29,6 +29,7 @@ from .nodes import (
     verify_report_node,
 )
 from .state import ResearchState
+from .settings import MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
 
 
 def _utc_now() -> str:
@@ -65,6 +66,25 @@ def _instrument_node(node_name: str, node: Callable[[ResearchState], dict[str, A
             }
             for entry in update.get("trace", [])
         ]
+        routers = {"agent": route_after_agent, "research_guard": route_after_research_guard,
+                   "assess_evidence": route_after_evidence_assessment,
+                   "verify_report": route_after_report_verification}
+        if node_name in routers:
+            merged = {**state, **update}
+            merged["messages"] = [*state.get("messages", []), *update.get("messages", [])]
+            destination = routers[node_name](merged)
+            reason = "结构化决策与程序规则"
+            if node_name == "agent" and destination == "research_guard":
+                latest = next((m for m in reversed(merged["messages"]) if hasattr(m, "tool_calls")), None)
+                if latest and latest.tool_calls:
+                    reason = ("研究轮次耗尽，本批工具请求未执行" if merged.get("research_round", 0) >= MAX_RESEARCH_ROUNDS
+                              else "本批工具请求将超过工具调用上限，未执行")
+            business_trace.append({"node": node_name, "event": "route_decision",
+                                   "detail": f"下一节点：{destination}；{reason}。",
+                                   "destination": destination, "research_round": merged.get("research_round", 0),
+                                   "tool_call_count": merged.get("tool_call_count", 0),
+                                   "tool_call_limit": MAX_TOOL_CALLS,
+                                   "timestamp": completed_at, "status": "success"})
 
         return {
             **update,

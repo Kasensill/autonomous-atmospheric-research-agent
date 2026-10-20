@@ -1,0 +1,123 @@
+{
+  "generated_at": "2026-10-20T09:59:57+08:00",
+  "summary": {
+    "case_count": 8,
+    "completed_cases": 8,
+    "failed_cases": 0,
+    "matched_cases": 8,
+    "verdict_accuracy": 1.0,
+    "false_pass_count": 0,
+    "false_revise_count": 0
+  },
+  "cases": [
+    {
+      "case_id": "supported_qualified_claim",
+      "category": "supported_claim",
+      "expected_verdict": "pass",
+      "actual_verdict": "pass",
+      "matched": true,
+      "reason": "草稿结论与 E1 内容一致，既说明了主体控制区下沉运动导致晴热少雨，也保留了边缘可能形成降水带的限定，没有把推断写成确定事实，符合用户要求的简要篇幅。",
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": null
+    },
+    {
+      "case_id": "absolute_overstatement",
+      "category": "overstatement",
+      "expected_verdict": "revise",
+      "actual_verdict": "revise",
+      "matched": true,
+      "reason": "草稿将证据中的“常”“控制区”扩大为无条件、全区域的必然结论，并遗漏副高边缘可致降水的限定，需修正表述与引用范围。",
+      "citation_issues": [
+        "[E1] 只支持“高压控制区常抑制云雨并促进晴热”，不支持“任何地区都必然高温干旱”的绝对化表述"
+      ],
+      "unsupported_claims": [
+        "“只要出现副热带高压，任何地区都必然高温干旱”把局部、统计性的影响写成无条件必然结果，且忽略副高边缘可形成降水带"
+      ],
+      "error": null
+    },
+    {
+      "case_id": "missing_citation",
+      "category": "citation_missing",
+      "expected_verdict": "revise",
+      "actual_verdict": "revise",
+      "matched": true,
+      "reason": "草稿结论与唯一证据 E1 的表述一致，未超出证据范围，也未将推断写成确定事实；内容简洁，符合简要回答的要求。 程序引用完整性检查发现问题。",
+      "citation_issues": [
+        "草稿未引用任何正式证据；应在关键事实性主张后标注 [E#]。"
+      ],
+      "unsupported_claims": [],
+      "error": null
+    },
+    {
+      "case_id": "nonexistent_citation",
+      "category": "citation_invalid",
+      "expected_verdict": "revise",
+      "actual_verdict": "revise",
+      "matched": true,
+      "reason": "结论内容与 E1 一致，但引用编号错误，需修正后才能通过核验。 程序引用完整性检查发现问题。",
+      "citation_issues": [
+        "报告引用 [E99]，但正式证据中只有 E1，引用编号不匹配",
+        "草稿引用了本次不存在的证据编号：[E99]。"
+      ],
+      "unsupported_claims": [],
+      "error": null
+    },
+    {
+      "case_id": "claim_evidence_mismatch",
+      "category": "citation_semantic_mismatch",
+      "expected_verdict": "revise",
+      "actual_verdict": "revise",
+      "matched": true,
+      "reason": "草稿结论与用户问题无关，且所引证据不支持该结论；需按E1重写结论并修正引用位置。",
+      "citation_issues": [
+        "E1被用来支持“全球海平面上升1米”，引用内容与主张不匹配；E1实际支持的是下沉运动抑制云雨并促进晴热"
+      ],
+      "unsupported_claims": [
+        "副热带高压会使全球海平面上升1米：证据E1只说明下沉运动抑制云雨、促进晴热，完全没有涉及海平面上升，属于无证据且与问题无关的主张"
+      ],
+      "error": null
+    },
+    {
+      "case_id": "model_conditions_not_station_observation",
+      "category": "data_kind_mismatch",
+      "expected_verdict": "revise",
+      "actual_verdict": "revise",
+      "matched": true,
+      "reason": "草稿将模型数据误写为站点实测，属于实质事实错误和引用不匹配，需修正表述并补充结论。",
+      "citation_issues": [
+        "E1 仅支持“模型当前条件气温 12°C”，不支持“站点实测”或“气象站实测”的表述"
+      ],
+      "unsupported_claims": [
+        "草稿把模型当前条件写成“站点实测结果”，并称“气象站实测气温”，与证据 E1 明确标注的“非地面站实测”矛盾"
+      ],
+      "error": null
+    },
+    {
+      "case_id": "cold_without_climatology",
+      "category": "internal_contradiction",
+      "expected_verdict": "revise",
+      "actual_verdict": "revise",
+      "matched": true,
+      "reason": "草稿结论前后矛盾，且将无证据的“比常年偏冷”写成确定事实，引用与主张不匹配。",
+      "citation_issues": [
+        "[E1] 仅支持当前气温 12°C，不支持“比常年偏冷”的结论"
+      ],
+      "unsupported_claims": [
+        "无法判断较常年偏冷还是偏暖，但可以确认今天比常年偏冷——前后自相矛盾，且证据未提供同期气候平均值，无法确认比常年偏冷"
+      ],
+      "error": null
+    },
+    {
+      "case_id": "qualified_model_weather",
+      "category": "supported_weather",
+      "expected_verdict": "pass",
+      "actual_verdict": "pass",
+      "matched": true,
+      "reason": "草稿与证据一致，明确区分模型条件与站点实测，未过度推断天气系统，篇幅符合简要要求。",
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": null
+    }
+  ]
+}

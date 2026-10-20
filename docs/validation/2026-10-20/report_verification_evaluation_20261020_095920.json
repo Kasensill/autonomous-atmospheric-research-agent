@@ -1,0 +1,102 @@
+{
+  "generated_at": "2026-10-20T09:59:08+08:00",
+  "summary": {
+    "case_count": 8,
+    "completed_cases": 0,
+    "failed_cases": 8,
+    "matched_cases": 0,
+    "verdict_accuracy": 0.0,
+    "false_pass_count": 0,
+    "false_revise_count": 0
+  },
+  "cases": [
+    {
+      "case_id": "supported_qualified_claim",
+      "category": "supported_claim",
+      "expected_verdict": "pass",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    },
+    {
+      "case_id": "absolute_overstatement",
+      "category": "overstatement",
+      "expected_verdict": "revise",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    },
+    {
+      "case_id": "missing_citation",
+      "category": "citation_missing",
+      "expected_verdict": "revise",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    },
+    {
+      "case_id": "nonexistent_citation",
+      "category": "citation_invalid",
+      "expected_verdict": "revise",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    },
+    {
+      "case_id": "claim_evidence_mismatch",
+      "category": "citation_semantic_mismatch",
+      "expected_verdict": "revise",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    },
+    {
+      "case_id": "model_conditions_not_station_observation",
+      "category": "data_kind_mismatch",
+      "expected_verdict": "revise",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    },
+    {
+      "case_id": "cold_without_climatology",
+      "category": "internal_contradiction",
+      "expected_verdict": "revise",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    },
+    {
+      "case_id": "qualified_model_weather",
+      "category": "supported_weather",
+      "expected_verdict": "pass",
+      "actual_verdict": null,
+      "matched": null,
+      "reason": null,
+      "citation_issues": [],
+      "unsupported_claims": [],
+      "error": "Connection error."
+    }
+  ]
+}

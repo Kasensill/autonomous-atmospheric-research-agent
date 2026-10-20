@@ -14,9 +14,9 @@ CASES_PATH = PROJECT_ROOT / "evals" / "report_verification_cases.json"
 def test_report_verification_dataset_has_positive_and_negative_cases() -> None:
     cases = load_report_verification_cases(CASES_PATH)
 
-    assert len(cases) == 5
-    assert [case.expected_verdict for case in cases].count("pass") == 1
-    assert [case.expected_verdict for case in cases].count("revise") == 4
+    assert len(cases) == 8
+    assert [case.expected_verdict for case in cases].count("pass") == 2
+    assert [case.expected_verdict for case in cases].count("revise") == 6
     assert {case.category for case in cases} >= {
         "supported_claim",
         "overstatement",

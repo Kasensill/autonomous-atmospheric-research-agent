@@ -89,4 +89,32 @@
     "expected_verdict": "revise",
     "note": "语义核验案例：引用编号真实存在，但该资料根本不支持海平面上升主张。"
   }
+,
+  {
+    "id": "model_conditions_not_station_observation",
+    "category": "data_kind_mismatch",
+    "question": "简要说明当前天气",
+    "evidence": [{"evidence_id":"weather1","content":"Open-Meteo 模型当前条件：气温 12°C，非地面站实测。","source_display_name":"模型当前条件","source_location":"https://example.org/model","source_type":"weather","tool_name":"get_current_weather"}],
+    "draft_report": "# 站点实测结果\n气象站实测气温为 12°C [E1]。",
+    "expected_verdict": "revise",
+    "note": "模型产品被误称为站点实测，即使数值和编号正确也必须修订。"
+  },
+  {
+    "id": "cold_without_climatology",
+    "category": "internal_contradiction",
+    "question": "当前天气偏冷还是偏暖？",
+    "evidence": [{"evidence_id":"weather1","content":"模型当前气温 12°C，未提供同期气候平均值。","source_display_name":"当前条件","source_location":"https://example.org/model","source_type":"weather","tool_name":"get_current_weather"}],
+    "draft_report": "无法判断较常年偏冷还是偏暖，但可以确认今天比常年偏冷 [E1]。",
+    "expected_verdict": "revise",
+    "note": "先声明不能判断，后又确认偏冷，既矛盾又缺气候态依据。"
+  },
+  {
+    "id": "qualified_model_weather",
+    "category": "supported_weather",
+    "question": "简要说明当前天气",
+    "evidence": [{"evidence_id":"weather1","content":"Open-Meteo 模型当前条件：气温 12°C，云量 20%，非地面站实测。","source_display_name":"模型当前条件","source_location":"https://example.org/model","source_type":"weather","tool_name":"get_current_weather"}],
+    "draft_report": "模型当前条件显示气温 12°C、云量 20%；这些不是站点实测，不能据此确认高压控制 [E1]。",
+    "expected_verdict": "pass",
+    "note": "正确标明产品性质，保留归因边界；用于检验保守误拦。"
+  }
 ]
