@@ -317,12 +317,13 @@ def agent_node(state: ResearchState) -> dict[str, Any]:
                         else "ask_user 参数错误：question 必须为非空文本；本轮未发起追问" if invalid
                         else "等待用户，非回答；已转交人工澄清流程")
                 messages_to_append.append(_control_response(call, text, error=exhausted or invalid))
-            elif not exhausted:
+            elif not exhausted and not invalid:
                 messages_to_append.append(_control_response(call, "本轮因澄清优先取消，未执行", error=True))
         if not exhausted:
             updates["trace"].append({"node": "agent", "event": "clarification_requested" if not invalid else "invalid_clarification_request",
-                                     "detail": f"合并 {len(ask_calls)} 个追问请求；取消 {len(research_calls)} 个研究工具请求，均不计入研究预算。"})
-        elif research_calls and not tool_batch_fits_budget(state, len(research_calls)):
+                                     "detail": (f"追问参数无效，未执行追问；{len(research_calls)} 个普通研究工具请求继续正常预算检查。" if invalid
+                                                else f"合并 {len(ask_calls)} 个追问请求；取消 {len(research_calls)} 个研究工具请求，均不计入研究预算。")})
+        if (exhausted or invalid) and research_calls and not tool_batch_fits_budget(state, len(research_calls)):
             # 此批普通请求被原有预算规则拒绝，补齐回应以免后续再次调用模型时悬空。
             messages_to_append.extend(_control_response(call, "研究预算不足，本批请求未执行", error=True) for call in research_calls)
         return updates
@@ -379,9 +380,6 @@ def route_after_agent(
 
     if state.get("clarification_question") and not clarifications_exhausted(state):
         return "request_clarification"
-    ask_calls = [call for call in latest_ai_message.tool_calls if call["name"] == ASK_USER_NAME]
-    if ask_calls and not clarifications_exhausted(state):
-        return "research_guard"  # 参数错误的控制请求也绝不能交给研究工具执行。
     research_calls = [call for call in latest_ai_message.tool_calls if call["name"] != ASK_USER_NAME]
     if research_calls:
         requested_count = len(research_calls)

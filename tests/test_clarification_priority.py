@@ -98,16 +98,63 @@ def test_multiple_asks_cancel_research_and_have_closed_protocol_before_pause(mon
 
 
 @pytest.mark.parametrize("question", ["", "   ", None, 123])
-def test_invalid_ask_is_closed_without_research_or_pause(monkeypatch, question):
+@pytest.mark.parametrize("with_research", [False, True])
+@pytest.mark.parametrize("budget_available", [False, True])
+def test_invalid_ask_preserves_research_and_never_pauses(monkeypatch, question, with_research, budget_available):
     state = create_initial_state("研究")
-    model = SequenceModel([AIMessage(content="", tool_calls=[ask(question=question), search()])])
+    state["research_round"] = 0 if budget_available else MAX_RESEARCH_ROUNDS
+    calls = [ask(question=question), *([search()] if with_research else [])]
+    model = SequenceModel([AIMessage(content="", tool_calls=calls)])
     monkeypatch.setattr(nodes, "create_research_model", lambda: model)
     update = nodes.agent_node(state)
     apply_update(state, update)
     assert state["clarification_question"] is None
-    assert nodes.route_after_agent(state) == "research_guard"
+    assert nodes.route_after_agent(state) == ("tools" if with_research and budget_available else "research_guard")
+    if with_research and budget_available:
+        assert len([m for m in update["messages"] if isinstance(m, ToolMessage)]) == 1
+        # 使用空注册表使普通工具得到安全错误回应，不调用真实服务。
+        monkeypatch.setattr(nodes, "RESEARCH_TOOLS", [])
+        apply_update(state, nodes.tools_node(state))
     assert_protocol_closed(state["messages"])
     assert any(e["event"] == "invalid_clarification_request" for e in update["trace"])
+
+
+@pytest.mark.parametrize("situation", ["valid", "exhausted", "invalid-empty", "invalid-type"])
+def test_final_graph_messages_have_exactly_one_response_per_call_id(monkeypatch, situation):
+    question = "哪个城市？" if situation in {"valid", "exhausted"} else "" if situation == "invalid-empty" else 123
+    response = AIMessage(content="", tool_calls=[ask("ask-exact", question), search("research-1"), search("research-2")])
+    model = SequenceModel([response, AIMessage(content='{"decision":"assess","plan_update":{}}')])
+    executed = []
+
+    @tool
+    def search_local_knowledge(query: str) -> dict:
+        """只记录执行，不联网。"""
+        executed.append(query)
+        return {"status": "success", "results": []}
+
+    monkeypatch.setattr(nodes, "RESEARCH_TOOLS", [search_local_knowledge])
+    graph = setup_real_graph(monkeypatch, model)
+    state = create_initial_state("研究")
+    state["evidence"] = evidence()
+    if situation == "exhausted":
+        state["clarification_history"] = history()
+    config = {"configurable": {"thread_id": state["run_id"]}}
+    result = graph.invoke(state, config)
+    if situation == "valid":
+        assert result["__interrupt__"]
+        result = graph.invoke(Command(resume="北京"), config)
+    else:
+        assert not result.get("__interrupt__")
+    assert result["final_report"]
+    assert_protocol_closed(result["messages"])
+    for message in result["messages"]:
+        if isinstance(message, AIMessage):
+            for call in message.tool_calls:
+                matches = [m for m in result["messages"] if isinstance(m, ToolMessage)
+                           and m.tool_call_id == call["id"]]
+                assert len(matches) == 1, f"{call['id']} 必须恰好得到一条回应"
+    assert len(executed) == (0 if situation == "valid" else 2)
+    assert result["tool_call_count"] == len(executed)
 
 
 def test_tools_safely_refuses_control_call_even_if_registry_contains_it(monkeypatch):
