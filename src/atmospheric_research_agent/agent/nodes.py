@@ -1214,7 +1214,7 @@ def finalize_limited_report_node(state: ResearchState) -> dict[str, Any]:
         )
         event = "report_withheld_after_failed_review"
         detail = "修订预算耗尽后仍未通过核验，已阻止交付未验证草稿。"
-    elif not state.get("evidence"):
+    elif not usable_evidence(state):
         final_report = _limited_report(
             "在允许的研究轮次和工具调用预算内，系统未取得可引用的正式证据。",
             "请调整研究问题、补充更具体的地点或时间，或稍后在资料源恢复后重新研究。",
@@ -1223,7 +1223,13 @@ def finalize_limited_report_node(state: ResearchState) -> dict[str, Any]:
         event = "limited_report_without_evidence"
         detail = "研究预算耗尽且没有正式证据，已交付说明原因的受限结论。"
     else:
-        raise ValueError("finalize_limited_report 只处理零证据耗尽或未通过核验的草稿。")
+        final_report = _limited_report(
+            "任务进入了无法可靠完成的异常状态，系统不能确认当前材料足以支持交付。",
+            "请由人工检查运行轨迹后重新研究；系统不输出未经核验的草稿。",
+            state,
+        )
+        event = "unexpected_state"
+        detail = "unexpected_state：仍有可用证据但没有 revise 审查结果，已安全返回通用失败说明。"
 
     return {
         "final_report": final_report,
