@@ -291,8 +291,9 @@ def agent_node(state: ResearchState) -> dict[str, Any]:
                 event="model_response",
                 detail="模型返回了工具调用。" if response.tool_calls else "模型返回了无工具决策。",
                 tool_calls=[{"name": call["name"], "args": {
-                    key: (str(value).split("?", 1)[0].split("#", 1)[0] if key == "url" else str(value))[:500]
-                    for key, value in call.get("args", {}).items() if key in {"query", "location", "url"}
+                    key: (str(value).split("?", 1)[0].split("#", 1)[0] if key == "url" else str(value))[:200 if key == "question" else 500]
+                    for key, value in call.get("args", {}).items()
+                    if key in {"query", "location", "url"} or (call["name"] == ASK_USER_NAME and key == "question")
                 }} for call in response.tool_calls],
             )
         ],
