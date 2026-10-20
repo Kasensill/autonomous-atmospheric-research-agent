@@ -11,3 +11,7 @@ evals/results/
 .env
 .env.*
 !.env.example
+
+# 生成材料与个人笔记，不入库；新增生成材料统一放在 docs/validation/ 下按日期分目录
+docs/career/
+docs/validation/
