@@ -14,6 +14,12 @@ MAX_TOOL_CALLS = 8
 GRAPH_RECURSION_LIMIT = 30
 # 报告最多接受一次受控修订；避免 Reflection 让图在写作与自检间无限循环。
 MAX_REPORT_REVISION_ROUNDS = 1
+MAX_CLARIFICATIONS = 2
+
+
+def clarifications_exhausted(state: Mapping[str, Any]) -> bool:
+    """Agent 与证据评估共用已完成问答历史，不额外维护计数器。"""
+    return len(state.get("clarification_history", [])) >= MAX_CLARIFICATIONS
 
 
 def research_rounds_exhausted(state: Mapping[str, Any]) -> bool:

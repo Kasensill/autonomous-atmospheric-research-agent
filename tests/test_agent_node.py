@@ -418,10 +418,11 @@ def test_request_clarification_records_answer(monkeypatch) -> None:
     assert update["clarification_history"][0]["answer"] == "北京"
 
 
-def test_clarify_decision_requires_a_question() -> None:
+@pytest.mark.parametrize("question", [None, "请提供地点"])
+def test_legacy_json_clarify_is_no_longer_accepted(question) -> None:
     with pytest.raises(ValueError, match="JSON"):
         parse_no_tool_decision(
-            '{"decision":"clarify","clarification_question":null,"plan_update":{}}'
+            json.dumps({"decision": "clarify", "clarification_question": question, "plan_update": {}})
         )
 
 
