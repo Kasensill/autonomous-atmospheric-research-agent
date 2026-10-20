@@ -74,7 +74,7 @@ def format_final_result(result: ResearchState, *, debug: bool = False) -> str:
         for item in trace:
             duration = item.get("duration_ms")
             duration_text = f" / {duration} ms" if duration is not None else ""
-            diagnostics = {key: item[key] for key in ("tool_calls", "tool_name", "returned_count", "accepted_count", "duplicate_count") if key in item}
+            diagnostics = {key: item[key] for key in ("tool_calls", "tool_name", "returned_count", "accepted_count", "duplicate_count", "relevance_gate", "top_scores") if key in item}
             diagnostics_text = f" {json.dumps(diagnostics, ensure_ascii=False)}" if diagnostics else ""
             trace_lines.append(
                 f"- [{item.get('timestamp', 'unknown')}] "
@@ -90,6 +90,8 @@ def format_final_result(result: ResearchState, *, debug: bool = False) -> str:
             f"- 研究轮次：{result.get('research_round', 0)}",
             f"- 工具调用数：{result.get('tool_call_count', 0)}",
             f"- 正式证据数：{len(result.get('evidence', []))}",
+            f"- 程序确认的限制：{result.get('program_limitations', [])}",
+            f"- 模型判断的限制：{result.get('assessment', {}).get('limitation_reasons', [])}",
         ]
         review = result.get("report_review")
         if review:

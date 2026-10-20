@@ -38,6 +38,7 @@ def test_query_local_knowledge_returns_traceable_results(monkeypatch) -> None:
                         "location": "03_环流/副热带高压.md",
                     },
                     "retrieval_distance": 0.31,
+                    "retrieval": {"rerank_score": 0.8},
                 }
             ],
             "retrieval_mode": "hybrid_rrf_rerank",

@@ -150,6 +150,43 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
 
 设计、逐条处理和验证边界见 [外部输出评价改进记录](docs/architecture/output_review_2026-10-20.md)。
 
+### 输出质量第二批：研究后实施（2026-10-20）
+
+| 条目 | 实际处理 | 验证与限制 |
+| --- | --- | --- |
+| 检索相关性门槛 | Rerank 成功时过滤低于 0.07 的候选，可返回零条 | 八题按 query 分校准/留出；留出负例误收 8→3，仍非零，阈值暂定 |
+| 对原有召回的影响 | 同一候选做过滤前后对照 | 十二题全部完成；Hit 1.000、MRR 0.9583、Coverage 0.8889 前后相同 |
+| 降级检索 | 向量/BM25/RRF 保持可用，明确门槛未应用 | 不拿不同尺度分数套阈值，降级结果仍有噪声风险 |
+| 检索噪声指标 | 增加显式负来源、已标噪声占比和标注覆盖 | 未标注不当无关；标注规模仍小 |
+| 过期当前天气 | 保存带时区有效时间，模型/报告读取适用证据视图 | 原始记录不删、引用不重编号；两小时业务窗口可配置，通用资料不受影响 |
+| 恢复后补查 | 模型输入已有适用证据、上轮缺口及预算 | 尚无语义查询去重或强制工具缓存，不宣称彻底消除过度检索 |
+| 受限原因 | 程序预算原因与模型推测的能力缺口/冲突/资料不足分开记录 | 可同时出现；模型判断不是程序确认的事实 |
+| 写作与修订一致性 | 与核验共享模型产品性质、比较基准及简要要求 | 首次端到端因“实况”误称被拦截；修复后第二次通过，失败记录保留 |
+| 天气快照记忆 | 合格交付也不写入长期知识记忆 | 实测出现 memory_skipped；检查点与运行记录仍保留 |
+| 气压/气候态、语义约束变更过滤 | 未增加 | 单点气压不足以完成区域归因；多年基准与地点/年份更正需独立设计 |
+| jieba 预热 | 保持已有进程内缓存 | 没有 Serverless 部署，不提前引入部署改造 |
+
+最终离线回归 **110 passed**。真实端到端第二次验收：正文609字符、2轮研究、3次工具调用、8条证据、
+一次追问恢复、零次修订、未存天气记忆，九项检查通过。首次验收未通过，不计为成功；
+两次为不同随机运行，并非严格性能 A/B，不能把用时/条数变化归为单个改动的因果收益。
+模型审查 pass 仍不能代替科学内容人工审核。
+
+可核对的原始结果：
+
+- [核验器八题结果](docs/validation/2026-10-20/report_verification_evaluation_20261020_100009.md)
+- [相关性门槛校准（含全部原始分数）](docs/validation/2026-10-20/relevance_gate_calibration.json)
+- [原有十二题门槛前后对照](docs/validation/2026-10-20/retrieval_gate_effect.json)
+- [首次完整运行：核验失败，安全收尾](docs/validation/2026-10-20/live_output_100806.md)
+- [修复后完整运行：609字符正文与Trace](docs/validation/2026-10-20/live_output_100931.md)
+
+复现研究性验收（将调用配置的 API 并产生费用；无需读取或展示密钥）：
+
+```powershell
+.venv\Scripts\python -m atmospheric_research_agent.evaluation.relevance_gate_runner
+.venv\Scripts\python -m atmospheric_research_agent.evaluation.retrieval_gate_effect
+.venv\Scripts\python -m atmospheric_research_agent.evaluation.live_output_review
+```
+
 - 本地检索已升级为 **向量召回 + 中文 BM25 + RRF + qwen3.7-text-rerank**；
   检索排名只表示问题与片段的相关性，不等于来源可信度。当前仅有 200 个可检索
   知识 Chunk，缺少专题资料时应生成受限结论，而不是外推为完整结论。

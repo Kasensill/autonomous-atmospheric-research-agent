@@ -79,6 +79,12 @@ def _instrument_node(node_name: str, node: Callable[[ResearchState], dict[str, A
                 if latest and latest.tool_calls:
                     reason = ("研究轮次耗尽，本批工具请求未执行" if merged.get("research_round", 0) >= MAX_RESEARCH_ROUNDS
                               else "本批工具请求将超过工具调用上限，未执行")
+                    code = "research_rounds_exhausted" if merged.get("research_round", 0) >= MAX_RESEARCH_ROUNDS else "tool_batch_exceeds_budget"
+                    update["program_limitations"] = list(dict.fromkeys([*state.get("program_limitations", []), code]))
+            if node_name in {"research_guard", "assess_evidence"} and (
+                merged.get("research_round", 0) >= MAX_RESEARCH_ROUNDS or merged.get("tool_call_count", 0) >= MAX_TOOL_CALLS
+            ):
+                update["program_limitations"] = list(dict.fromkeys([*state.get("program_limitations", []), "budget_exhausted"]))
             business_trace.append({"node": node_name, "event": "route_decision",
                                    "detail": f"下一节点：{destination}；{reason}。",
                                    "destination": destination, "research_round": merged.get("research_round", 0),

@@ -15,7 +15,8 @@ from ...ingestion.build_index import (
 )
 from ..retrieval.bm25 import bm25_index_path, search_bm25
 from ..retrieval.fusion import reciprocal_rank_fusion
-from ..retrieval.rerank import rerank_fused_candidates
+from ..retrieval.rerank import rerank_fused_candidates, filter_relevance
+from ..settings import RERANK_MIN_SCORE
 from ..settings import (
     BM25_CANDIDATE_TOP_K,
     FUSED_CANDIDATE_TOP_K,
@@ -263,15 +264,30 @@ def query_local_knowledge(
             "results": [],
         }
 
+    accepted_results = _admitted_results(retrieval_result)
+    if retrieval_result["retrieval_mode"] != "hybrid_rrf_rerank":
+        retrieval_result["warnings"].append("当前降级路径没有可比 Rerank 分数，相关性门槛未应用。")
     return {
         "status": "success",
         "tool": "search_local_knowledge",
         "query": clean_query,
-        "result_count": len(retrieval_result["results"]),
+        "result_count": len(accepted_results),
         "retrieval_mode": retrieval_result["retrieval_mode"],
         "warnings": retrieval_result["warnings"],
-        "results": retrieval_result["results"],
+        "results": accepted_results,
+        "relevance_gate": {
+            "threshold": RERANK_MIN_SCORE,
+            "applied": retrieval_result["retrieval_mode"] == "hybrid_rrf_rerank",
+            "rejected_count": len(retrieval_result["results"]) - len(accepted_results),
+        },
     }
+
+
+def _admitted_results(result: dict[str, Any]) -> list[dict[str, Any]]:
+    if result["retrieval_mode"] == "hybrid_rrf_rerank":
+        return filter_relevance(result["results"], RERANK_MIN_SCORE)
+    # 向量、BM25、RRF 不共享 rerank 分数尺度；降级可用性保留，但明确门槛未应用。
+    return result["results"]
 
 
 def compare_local_retrievers(

@@ -43,6 +43,10 @@ def review_case_with_production_model(case: ReportVerificationCase) -> dict[str,
 
     state: ResearchState = create_initial_state(case.question)
     state["evidence"] = list(case.evidence)
+    # 这些是语义核验的固定题面，不是在线天气缓存；补当前有效时间隔离时效性测试。
+    for item in state["evidence"]:
+        if item.get("source_type") == "weather":
+            item["valid_at"] = datetime.now().astimezone().isoformat()
     state["draft_report"] = case.draft_report
     update = verify_report_with_model(state, create_verification_model())
     return update["report_review"]

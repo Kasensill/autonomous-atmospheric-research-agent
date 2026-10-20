@@ -51,6 +51,9 @@ class EvidenceRecord(TypedDict, total=False):
     author_or_organization: str
     # 网页发表时间或天气观测时间；没有可靠值时不填写。
     published_or_observed_at: str
+    # 当前天气有效时间（带时区）及抓取时间；用于恢复后重新检查时效性。
+    valid_at: str | None
+    fetched_at: str | None
 
 
 class EvidenceAssessment(TypedDict, total=False):
@@ -68,6 +71,7 @@ class EvidenceAssessment(TypedDict, total=False):
     next_step: Literal["continue", "clarify", "full_report", "limited_report"]
     # 以上判断的简短可审查理由，显示给 Trace 和后续节点。
     reason: str
+    limitation_reasons: list[str]
 
 
 class ReportReview(TypedDict, total=False):
@@ -141,6 +145,8 @@ class TraceEntry(TypedDict, total=False):
     research_round: int
     tool_call_count: int
     tool_call_limit: int
+    relevance_gate: dict
+    top_scores: list[float | None]
 
 
 class ResearchState(TypedDict, total=False):
@@ -183,6 +189,8 @@ class ResearchState(TypedDict, total=False):
     research_round: int
     # 已实际执行的工具调用总数；不同于 research_round，一批可含多个 Tool。
     tool_call_count: int
+    # 程序确认的停止原因；与 assessment 中模型推测的能力缺口等原因分开。
+    program_limitations: list[str]
 
     # Evidence Review 节点的最近一次判断；决定继续、澄清还是进入报告阶段。
     assessment: EvidenceAssessment
@@ -230,6 +238,7 @@ def create_initial_state(question: str) -> ResearchState:
         "evidence": [],
         "research_round": 0,
         "tool_call_count": 0,
+        "program_limitations": [],
         "clarification_question": None,
         "clarification_history": [],
         "final_report": None,

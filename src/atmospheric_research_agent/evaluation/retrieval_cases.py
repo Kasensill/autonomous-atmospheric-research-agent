@@ -20,6 +20,7 @@ class RetrievalCase:
     expected_sources: tuple[SourceReference, ...]
     note: str
     known_data_gap: bool = False
+    irrelevant_sources: tuple[SourceReference, ...] = ()
 
 
 def _require_non_empty_string(value: Any, field_name: str, case_id: str) -> str:
@@ -83,6 +84,13 @@ def load_retrieval_cases(path: Path) -> list[RetrievalCase]:
                 expected_sources=tuple(sources),
                 note=_require_non_empty_string(raw_case.get("note"), "note", case_id),
                 known_data_gap=known_data_gap,
+                irrelevant_sources=tuple(SourceReference(
+                    location=_require_non_empty_string(item.get("location"), "irrelevant_sources.location", case_id),
+                    section=_require_non_empty_string(item.get("section"), "irrelevant_sources.section", case_id),
+                ) for item in raw_case.get("irrelevant_sources", [])),
             )
         )
+    for case in cases:
+        if set(case.expected_sources) & set(case.irrelevant_sources):
+            raise ValueError(f"评测题 {case.case_id} 的正负标签冲突。")
     return cases

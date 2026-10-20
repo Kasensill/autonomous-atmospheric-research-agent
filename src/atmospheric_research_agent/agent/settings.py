@@ -30,6 +30,11 @@ RRF_RANK_CONSTANT = 60
 FUSED_CANDIDATE_TOP_K = 12
 RERANK_MODEL = "qwen3.7-text-rerank"
 RERANK_FINAL_TOP_K = 4
+# 2026-10-20 小型显式正负样本校准的暂定门槛；只适用于当前 Qwen 模型分数。
+# 留出集仍有误收，见 docs/validation；不是正确概率或通用最优值。
+RERANK_MIN_SCORE = 0.07
+# 当前天气证据的业务新鲜度窗口；可调整，不适用于通用机制资料。
+WEATHER_EVIDENCE_MAX_AGE_SECONDS = 2 * 60 * 60
 WEB_SEARCH_TIMEOUT_SECONDS = 15
 WEB_SEARCH_MAX_RESULTS = 5
 WEATHER_REQUEST_TIMEOUT_SECONDS = 15

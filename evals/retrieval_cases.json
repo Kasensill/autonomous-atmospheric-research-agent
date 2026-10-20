@@ -1,6 +1,10 @@
 [
   {
     "id": "subtropical_high_semantic_mechanism",
+    "irrelevant_sources": [
+      {"location":"06_气候系统与气候变化/39_ENSO.md","section":"定义与背景"},
+      {"location":"05_热带天气系统/35_马登_朱利安振荡.md","section":"定义与背景"}
+    ],
     "question": "为什么副热带高压控制期间天气常表现为晴热少雨？",
     "category": "semantic_paraphrase",
     "expected_sources": [

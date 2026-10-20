@@ -1,0 +1,1434 @@
+{
+  "generated_at": "2026-10-20T10:06:32.175407+08:00",
+  "threshold": 0.07,
+  "completed": 12,
+  "errors": [],
+  "cases": [
+    {
+      "id": "subtropical_high_semantic_mechanism",
+      "query": "为什么副热带高压控制期间天气常表现为晴热少雨？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 副热带高压及其天气影响\n## 影响与表现\n高压控制区下沉运动常抑制云雨并促进晴热；其边缘可与暖湿气流、低空急流和扰动配合，形成降水带。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 副热带高压及其天气影响 > 影响与表现",
+            "location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "副热带高压及其天气影响",
+            "section": "影响与表现"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.32533758878707886,
+          "chunk_id": "aa4eae731fad46e5bd2e1e37",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.32533758878707886,
+            "bm25_rank": 2,
+            "bm25_score": 8.517485232768873,
+            "rrf_score": 0.03252247488101534,
+            "rerank_rank": 1,
+            "rerank_score": 0.9996707264650309
+          }
+        },
+        {
+          "content": "# 高压、低压与地面天气图\n## 形成机制\n下沉运动常与高压和云量减少相关，上升运动常与低压、凝结和降水相关；风受压强梯度、科里奥利效应和摩擦共同控制。",
+          "source": {
+            "display_name": "知识库：04_天气系统与中高纬过程 > 高压、低压与地面天气图 > 形成机制",
+            "location": "04_天气系统与中高纬过程/25_高压_低压与地面天气图.md",
+            "type": "local_knowledge",
+            "category": "04_天气系统与中高纬过程",
+            "title": "高压、低压与地面天气图",
+            "section": "形成机制"
+          },
+          "vector_rank": 7,
+          "retrieval_distance": 0.7445207238197327,
+          "chunk_id": "e950f85eca19cc199d9ff52b",
+          "fused_rank": 6,
+          "retrieval": {
+            "vector_rank": 7,
+            "retrieval_distance": 0.7445207238197327,
+            "bm25_rank": 6,
+            "bm25_score": 6.681825212058641,
+            "rrf_score": 0.03007688828584351,
+            "rerank_rank": 2,
+            "rerank_score": 0.6798989699286606
+          }
+        },
+        {
+          "content": "# 副热带高压及其天气影响\n## 适用条件与局限性\n不能把高压简单等同于“必然高温干旱”；边缘位置、湿度和局地触发条件决定具体天气。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 副热带高压及其天气影响 > 适用条件与局限性",
+            "location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "副热带高压及其天气影响",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.5524789690971375,
+          "chunk_id": "6c432f591fc0319fdecf8e9c",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.5524789690971375,
+            "bm25_rank": 8,
+            "bm25_score": 5.439477813251878,
+            "rrf_score": 0.030330882352941176,
+            "rerank_rank": 3,
+            "rerank_score": 0.6733735552393616
+          }
+        },
+        {
+          "content": "# 副热带高压及其天气影响\n## 形成机制\n它与全球环流中的副热带下沉支有关，并受海温、季节变化和周边波动系统调制。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 副热带高压及其天气影响 > 形成机制",
+            "location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "副热带高压及其天气影响",
+            "section": "形成机制"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.4859848618507385,
+          "chunk_id": "baa1af50ec423007760603f7",
+          "fused_rank": 5,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.4859848618507385,
+            "bm25_rank": 11,
+            "bm25_score": 4.9930040390094526,
+            "rrf_score": 0.03021353930031804,
+            "rerank_rank": 4,
+            "rerank_score": 0.5797493513561537
+          }
+        }
+      ]
+    },
+    {
+      "id": "high_pressure_boundary",
+      "query": "高压系统一出现，就一定意味着高温干旱吗？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 副热带高压及其天气影响\n## 适用条件与局限性\n不能把高压简单等同于“必然高温干旱”；边缘位置、湿度和局地触发条件决定具体天气。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 副热带高压及其天气影响 > 适用条件与局限性",
+            "location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "副热带高压及其天气影响",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.5088434815406799,
+          "chunk_id": "6c432f591fc0319fdecf8e9c",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.5088434815406799,
+            "bm25_rank": 1,
+            "bm25_score": 9.738732579207555,
+            "rrf_score": 0.03278688524590164,
+            "rerank_rank": 1,
+            "rerank_score": 0.9998579165546059
+          }
+        },
+        {
+          "content": "# 高压、低压与地面天气图\n## 适用条件与局限性\n高低压描述的是形势，不是天气保证；季节、湿度和地形可使同类系统产生不同结果。",
+          "source": {
+            "display_name": "知识库：04_天气系统与中高纬过程 > 高压、低压与地面天气图 > 适用条件与局限性",
+            "location": "04_天气系统与中高纬过程/25_高压_低压与地面天气图.md",
+            "type": "local_knowledge",
+            "category": "04_天气系统与中高纬过程",
+            "title": "高压、低压与地面天气图",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.6825724840164185,
+          "chunk_id": "3605b76984351356d045f2d3",
+          "fused_rank": 10,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.6825724840164185,
+            "rrf_score": 0.015625,
+            "rerank_rank": 2,
+            "rerank_score": 0.8443820658728991
+          }
+        },
+        {
+          "content": "# 副热带高压及其天气影响\n## 影响与表现\n高压控制区下沉运动常抑制云雨并促进晴热；其边缘可与暖湿气流、低空急流和扰动配合，形成降水带。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 副热带高压及其天气影响 > 影响与表现",
+            "location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "副热带高压及其天气影响",
+            "section": "影响与表现"
+          },
+          "vector_rank": 5,
+          "retrieval_distance": 0.6893670558929443,
+          "chunk_id": "aa4eae731fad46e5bd2e1e37",
+          "fused_rank": 11,
+          "retrieval": {
+            "vector_rank": 5,
+            "retrieval_distance": 0.6893670558929443,
+            "rrf_score": 0.015384615384615385,
+            "rerank_rank": 3,
+            "rerank_score": 0.7971398492409434
+          }
+        },
+        {
+          "content": "# 阻塞高压\n## 影响与表现\n阻塞可使某地长期少雨高温，也可能让另一侧锋面和降水带持续影响同一区域。",
+          "source": {
+            "display_name": "知识库：04_天气系统与中高纬过程 > 阻塞高压 > 影响与表现",
+            "location": "04_天气系统与中高纬过程/28_阻塞高压.md",
+            "type": "local_knowledge",
+            "category": "04_天气系统与中高纬过程",
+            "title": "阻塞高压",
+            "section": "影响与表现"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.6459968090057373,
+          "chunk_id": "4893a198679a23958ff6714e",
+          "fused_rank": 7,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.6459968090057373,
+            "rrf_score": 0.016129032258064516,
+            "rerank_rank": 4,
+            "rerank_score": 0.7112332620746291
+          }
+        }
+      ]
+    },
+    {
+      "id": "low_level_jet_heavy_rain",
+      "query": "850 hPa 低空急流与暴雨有什么关系？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.75
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.75
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 低空急流与强降水\n## 影响与表现\n对暴雨研究而言，低空急流最重要的诊断价值通常是三部分：\n\n- **水汽供给**：急流增强低层暖湿空气的平流与输送，使降水系统获得可持续的水汽来源；\n- **触发与维持**：在急流出口、急流轴附近的辐合区，或急流与锋面、地形相遇处，低层辐合和抬升可帮助对流触发或反复生成；\n- **空间和时间定位**：急流轴、急流出口和水汽通量最大区的位置变化，会影响强降水更可能出现在哪里；若系统移动缓慢、对流反复经过同一地区，累积雨量风险更高。\n\n因此，“850 hPa 低空急流与暴雨有关”更准确地说是：它可能通过水汽输送和有利的低层动力配置，为暴雨提供必要环境条件之一，而不是单独构成充分原因。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 影响与表现",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "影响与表现"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.2269981950521469,
+          "chunk_id": "7fd1cae7675733ca2295ce1e",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.2269981950521469,
+            "bm25_rank": 2,
+            "bm25_score": 8.050077377228849,
+            "rrf_score": 0.03252247488101534,
+            "rerank_rank": 1,
+            "rerank_score": 0.9999793070857332
+          }
+        },
+        {
+          "content": "# 低空急流与强降水\n## 形成机制\n低空急流本身不“制造”水汽，而是能把暖湿空气沿低层快速输送到下游地区，因而可增强水汽平流和水平水汽通量。当急流指向锋面、地形或其他低层边界，且急流出口附近出现水汽辐合时，空气更容易被迫上升；若同时存在不稳定层结和持续的抬升，输送来的水汽便可支持深对流和强降水。\n\n在东亚，850 hPa 低空急流与梅雨/白雨锋相互作用时，常与持续的深对流和强降水环境相关。美国国家气象局的个例复盘也显示，850 hPa 急流可将温暖潮湿气团沿边界向下游输送；该低层输送与高层辐散等其他动力条件共同出现时，环境才更有利于强对流和大雨。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 形成机制",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "形成机制"
+          },
+          "vector_rank": 3,
+          "retrieval_distance": 0.4130859971046448,
+          "chunk_id": "d408bdf04ae6c2ccf323f15a",
+          "fused_rank": 4,
+          "retrieval": {
+            "vector_rank": 3,
+            "retrieval_distance": 0.4130859971046448,
+            "bm25_rank": 4,
+            "bm25_score": 6.553460052483969,
+            "rrf_score": 0.03149801587301587,
+            "rerank_rank": 2,
+            "rerank_score": 0.9993267408202221
+          }
+        },
+        {
+          "content": "# 低空急流与强降水\n## 适用条件与局限性\n不能仅凭某层风速大或存在低空急流，就断言某地必然暴雨。还需要检查水汽是否充足、是否存在锋面/地形/辐合等抬升机制、层结是否利于对流、降水系统能否维持，以及系统移动速度。不同地区的低空急流核心高度和降水响应也不同，因此不能把某一地区或单一个例的风速阈值直接推广为通用标准。\n\n对具体历史事件的诊断，还应结合该时段的 850 hPa 风场和水汽通量、地面或锋面边界、探空/再分析资料、雷达和站点降水，而不能只根据一张急流图作因果判断。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 适用条件与局限性",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.38144177198410034,
+          "chunk_id": "c3ed9a5b34d3d237ea616d17",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.38144177198410034,
+            "bm25_rank": 3,
+            "bm25_score": 7.008403068150457,
+            "rrf_score": 0.03200204813108039,
+            "rerank_rank": 3,
+            "rerank_score": 0.802197092355044
+          }
+        },
+        {
+          "content": "# 低空急流与强降水\n## 定义与背景\n低空急流（Low-Level Jet, LLJ）是低层大气中相对狭窄的强风速带，通常可理解为最大风速位于约 700 hPa 以下的低层风速极大区。其最大风速高度随地区、季节和天气系统而变；850 hPa 是业务分析和东亚雨季研究中常用的诊断层次，但不是所有低空急流都必须在 850 hPa 达到最大风速。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 定义与背景",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "定义与背景"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.4504583477973938,
+          "chunk_id": "ce4dd3a38e38f0d054e9876a",
+          "fused_rank": 2,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.4504583477973938,
+            "bm25_rank": 1,
+            "bm25_score": 8.823934388978389,
+            "rrf_score": 0.032018442622950824,
+            "rerank_rank": 4,
+            "rerank_score": 0.7828702545609864
+          }
+        }
+      ]
+    },
+    {
+      "id": "heavy_rain_ingredients",
+      "query": "发生暴雨时，水汽、抬升和对流组织分别起到什么作用？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 0.6666666666666666,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 0.6666666666666666,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 暴雨与短时强降水\n## 形成机制\n充足水汽、持续抬升、对流反复生成或缓慢移动、地形作用和中尺度辐合都可增强降水。",
+          "source": {
+            "display_name": "知识库：07_典型气象灾害 > 暴雨与短时强降水 > 形成机制",
+            "location": "07_典型气象灾害/42_暴雨与短时强降水.md",
+            "type": "local_knowledge",
+            "category": "07_典型气象灾害",
+            "title": "暴雨与短时强降水",
+            "section": "形成机制"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.38850608468055725,
+          "chunk_id": "f4c07ad24202dae65f395c9a",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.38850608468055725,
+            "bm25_rank": 1,
+            "bm25_score": 15.22352362540599,
+            "rrf_score": 0.03278688524590164,
+            "rerank_rank": 1,
+            "rerank_score": 0.9543574521867733
+          }
+        },
+        {
+          "content": "# 低空急流与强降水\n## 影响与表现\n对暴雨研究而言，低空急流最重要的诊断价值通常是三部分：\n\n- **水汽供给**：急流增强低层暖湿空气的平流与输送，使降水系统获得可持续的水汽来源；\n- **触发与维持**：在急流出口、急流轴附近的辐合区，或急流与锋面、地形相遇处，低层辐合和抬升可帮助对流触发或反复生成；\n- **空间和时间定位**：急流轴、急流出口和水汽通量最大区的位置变化，会影响强降水更可能出现在哪里；若系统移动缓慢、对流反复经过同一地区，累积雨量风险更高。\n\n因此，“850 hPa 低空急流与暴雨有关”更准确地说是：它可能通过水汽输送和有利的低层动力配置，为暴雨提供必要环境条件之一，而不是单独构成充分原因。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 影响与表现",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "影响与表现"
+          },
+          "vector_rank": 9,
+          "retrieval_distance": 0.6597312688827515,
+          "chunk_id": "7fd1cae7675733ca2295ce1e",
+          "fused_rank": 5,
+          "retrieval": {
+            "vector_rank": 9,
+            "retrieval_distance": 0.6597312688827515,
+            "bm25_rank": 10,
+            "bm25_score": 6.899702269819665,
+            "rrf_score": 0.02877846790890269,
+            "rerank_rank": 2,
+            "rerank_score": 0.681418685504081
+          }
+        },
+        {
+          "chunk_id": "d408bdf04ae6c2ccf323f15a",
+          "content": "# 低空急流与强降水\n## 形成机制\n低空急流本身不“制造”水汽，而是能把暖湿空气沿低层快速输送到下游地区，因而可增强水汽平流和水平水汽通量。当急流指向锋面、地形或其他低层边界，且急流出口附近出现水汽辐合时，空气更容易被迫上升；若同时存在不稳定层结和持续的抬升，输送来的水汽便可支持深对流和强降水。\n\n在东亚，850 hPa 低空急流与梅雨/白雨锋相互作用时，常与持续的深对流和强降水环境相关。美国国家气象局的个例复盘也显示，850 hPa 急流可将温暖潮湿气团沿边界向下游输送；该低层输送与高层辐散等其他动力条件共同出现时，环境才更有利于强对流和大雨。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 形成机制",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "形成机制"
+          },
+          "bm25_rank": 6,
+          "bm25_score": 8.708854250610933,
+          "fused_rank": 10,
+          "retrieval": {
+            "bm25_rank": 6,
+            "bm25_score": 8.708854250610933,
+            "rrf_score": 0.015151515151515152,
+            "rerank_rank": 3,
+            "rerank_score": 0.6683410901847711
+          }
+        },
+        {
+          "content": "# 对流触发条件与发展\n## 形成机制\n典型条件包括充足水汽、不稳定层结和抬升机制。锋面、地形、海陆风辐合或旧对流外流边界都可能提供抬升。",
+          "source": {
+            "display_name": "知识库：02_云_降水与对流 > 对流触发条件与发展 > 形成机制",
+            "location": "02_云_降水与对流/09_对流触发条件与发展.md",
+            "type": "local_knowledge",
+            "category": "02_云_降水与对流",
+            "title": "对流触发条件与发展",
+            "section": "形成机制"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.5441548228263855,
+          "chunk_id": "b4e0762b504a49f2297eea45",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.5441548228263855,
+            "bm25_rank": 5,
+            "bm25_score": 8.829973764983706,
+            "rrf_score": 0.031009615384615385,
+            "rerank_rank": 4,
+            "rerank_score": 0.6329589724436491
+          }
+        }
+      ]
+    },
+    {
+      "id": "convergence_divergence_lift",
+      "query": "高层辐散和低层辐合为什么有利于云雨发展？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 散度、涡度与垂直运动\n## 形成机制\n低层辐合有利于空气被迫上升，高层辐散有利于维持上升；涡度平流和形势变化可调制这种配置。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 散度、涡度与垂直运动 > 形成机制",
+            "location": "03_大气动力学与环流/17_散度_涡度与垂直运动.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "散度、涡度与垂直运动",
+            "section": "形成机制"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.3781379759311676,
+          "chunk_id": "fd165b506a0aea3f93cb883d",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.3781379759311676,
+            "bm25_rank": 1,
+            "bm25_score": 20.428833874534373,
+            "rrf_score": 0.03278688524590164,
+            "rerank_rank": 1,
+            "rerank_score": 0.9181227161506287
+          }
+        },
+        {
+          "content": "# 散度、涡度与垂直运动\n## 影响与表现\n上升运动有利于云和降水发展，下沉运动常抑制云量并促进晴空增温。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 散度、涡度与垂直运动 > 影响与表现",
+            "location": "03_大气动力学与环流/17_散度_涡度与垂直运动.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "散度、涡度与垂直运动",
+            "section": "影响与表现"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.5053601861000061,
+          "chunk_id": "4eb20892472bd41086d7e517",
+          "fused_rank": 2,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.5053601861000061,
+            "bm25_rank": 7,
+            "bm25_score": 7.197215268052493,
+            "rrf_score": 0.031054405392392875,
+            "rerank_rank": 2,
+            "rerank_score": 0.7086671405648783
+          }
+        },
+        {
+          "chunk_id": "d408bdf04ae6c2ccf323f15a",
+          "content": "# 低空急流与强降水\n## 形成机制\n低空急流本身不“制造”水汽，而是能把暖湿空气沿低层快速输送到下游地区，因而可增强水汽平流和水平水汽通量。当急流指向锋面、地形或其他低层边界，且急流出口附近出现水汽辐合时，空气更容易被迫上升；若同时存在不稳定层结和持续的抬升，输送来的水汽便可支持深对流和强降水。\n\n在东亚，850 hPa 低空急流与梅雨/白雨锋相互作用时，常与持续的深对流和强降水环境相关。美国国家气象局的个例复盘也显示，850 hPa 急流可将温暖潮湿气团沿边界向下游输送；该低层输送与高层辐散等其他动力条件共同出现时，环境才更有利于强对流和大雨。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 形成机制",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "形成机制"
+          },
+          "bm25_rank": 3,
+          "bm25_score": 9.307210792473262,
+          "fused_rank": 8,
+          "retrieval": {
+            "bm25_rank": 3,
+            "bm25_score": 9.307210792473262,
+            "rrf_score": 0.015873015873015872,
+            "rerank_rank": 3,
+            "rerank_score": 0.5711983188670546
+          }
+        },
+        {
+          "content": "# 热带对流组织\n## 形成机制\n暖海温和高湿环境提供能量，低层辐合促进抬升；风切变和大尺度波动影响对流能否聚集和传播。",
+          "source": {
+            "display_name": "知识库：05_热带天气系统 > 热带对流组织 > 形成机制",
+            "location": "05_热带天气系统/34_热带对流组织.md",
+            "type": "local_knowledge",
+            "category": "05_热带天气系统",
+            "title": "热带对流组织",
+            "section": "形成机制"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.5998795032501221,
+          "chunk_id": "0f6bd8e1b817d837d7fca3e9",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.5998795032501221,
+            "bm25_rank": 6,
+            "bm25_score": 7.374203192436996,
+            "rrf_score": 0.030776515151515152,
+            "rerank_rank": 4,
+            "rerank_score": 0.5314183404965359
+          }
+        }
+      ]
+    },
+    {
+      "id": "enso_remote_influence",
+      "query": "热带太平洋海温和信风的异常，为什么会影响其他地区的降水？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 0.5,
+        "coverage_at_k": 0.5,
+        "first_relevant_rank": 2,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.25
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 0.5,
+        "coverage_at_k": 0.5,
+        "first_relevant_rank": 2,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.25
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 遥相关：AO、NAO、PDO 等\n## 形成机制\n大尺度环流、海温和行星波可把一个区域的异常影响传递到远方，并改变风暴路径、温度或降水概率。",
+          "source": {
+            "display_name": "知识库：06_气候系统与气候变化 > 遥相关：AO、NAO、PDO 等 > 形成机制",
+            "location": "06_气候系统与气候变化/40_遥相关_AO_NAO_PDO.md",
+            "type": "local_knowledge",
+            "category": "06_气候系统与气候变化",
+            "title": "遥相关：AO、NAO、PDO 等",
+            "section": "形成机制"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.5749849081039429,
+          "chunk_id": "b96b1ca176b4bb234b2ccb65",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.5749849081039429,
+            "bm25_rank": 1,
+            "bm25_score": 14.908632478131697,
+            "rrf_score": 0.03252247488101534,
+            "rerank_rank": 1,
+            "rerank_score": 0.6858880358842838
+          }
+        },
+        {
+          "content": "# 厄尔尼诺—南方涛动（ENSO）\n## 影响与表现\nENSO 可通过遥相关改变世界多地的降水、气温和风暴活动概率，但影响的方向和强度因地区、季节和事件类型而异。",
+          "source": {
+            "display_name": "知识库：06_气候系统与气候变化 > 厄尔尼诺—南方涛动（ENSO） > 影响与表现",
+            "location": "06_气候系统与气候变化/39_ENSO.md",
+            "type": "local_knowledge",
+            "category": "06_气候系统与气候变化",
+            "title": "厄尔尼诺—南方涛动（ENSO）",
+            "section": "影响与表现"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.545913815498352,
+          "chunk_id": "cf6e9e58a2e0b12e50758817",
+          "fused_rank": 2,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.545913815498352,
+            "bm25_rank": 9,
+            "bm25_score": 7.535773562764538,
+            "rrf_score": 0.030886196246139225,
+            "rerank_rank": 2,
+            "rerank_score": 0.6334016019110972
+          }
+        },
+        {
+          "chunk_id": "39bfc0f41f49620c763a8a9d",
+          "content": "# 厄尔尼诺—南方涛动（ENSO）\n## 定义与背景\nENSO 是热带太平洋海表温度、信风和大气对流相互耦合的年际变率现象，包含厄尔尼诺和拉尼娜等位相。",
+          "source": {
+            "display_name": "知识库：06_气候系统与气候变化 > 厄尔尼诺—南方涛动（ENSO） > 定义与背景",
+            "location": "06_气候系统与气候变化/39_ENSO.md",
+            "type": "local_knowledge",
+            "category": "06_气候系统与气候变化",
+            "title": "厄尔尼诺—南方涛动（ENSO）",
+            "section": "定义与背景"
+          },
+          "bm25_rank": 2,
+          "bm25_score": 13.204571146639278,
+          "fused_rank": 7,
+          "retrieval": {
+            "bm25_rank": 2,
+            "bm25_score": 13.204571146639278,
+            "rrf_score": 0.016129032258064516,
+            "rerank_rank": 3,
+            "rerank_score": 0.586802161509982
+          }
+        },
+        {
+          "content": "# 马登—朱利安振荡（MJO）\n## 影响与表现\nMJO 可调制热带降水、季风、热带气旋生成环境，并通过遥相关影响中高纬天气。",
+          "source": {
+            "display_name": "知识库：05_热带天气系统 > 马登—朱利安振荡（MJO） > 影响与表现",
+            "location": "05_热带天气系统/35_马登_朱利安振荡.md",
+            "type": "local_knowledge",
+            "category": "05_热带天气系统",
+            "title": "马登—朱利安振荡（MJO）",
+            "section": "影响与表现"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.6135149598121643,
+          "chunk_id": "88cc695a53f19a113aa33d25",
+          "fused_rank": 9,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.6135149598121643,
+            "rrf_score": 0.015625,
+            "rerank_rank": 4,
+            "rerank_score": 0.49782123746669626
+          }
+        }
+      ]
+    },
+    {
+      "id": "mjo_tropical_modulation",
+      "query": "热带中有一个数十天尺度、向东传播的对流异常，它会如何影响季风和热带气旋环境？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 马登—朱利安振荡（MJO）\n## 影响与表现\nMJO 可调制热带降水、季风、热带气旋生成环境，并通过遥相关影响中高纬天气。",
+          "source": {
+            "display_name": "知识库：05_热带天气系统 > 马登—朱利安振荡（MJO） > 影响与表现",
+            "location": "05_热带天气系统/35_马登_朱利安振荡.md",
+            "type": "local_knowledge",
+            "category": "05_热带天气系统",
+            "title": "马登—朱利安振荡（MJO）",
+            "section": "影响与表现"
+          },
+          "vector_rank": 5,
+          "retrieval_distance": 0.6534561514854431,
+          "chunk_id": "88cc695a53f19a113aa33d25",
+          "fused_rank": 4,
+          "retrieval": {
+            "vector_rank": 5,
+            "retrieval_distance": 0.6534561514854431,
+            "bm25_rank": 4,
+            "bm25_score": 12.967203308980567,
+            "rrf_score": 0.031009615384615385,
+            "rerank_rank": 1,
+            "rerank_score": 0.8803556840832294
+          }
+        },
+        {
+          "content": "# 马登—朱利安振荡（MJO）\n## 定义与背景\nMJO 是热带地区东传的对流和环流异常模态，常以数十天尺度影响印度洋和太平洋热带天气。",
+          "source": {
+            "display_name": "知识库：05_热带天气系统 > 马登—朱利安振荡（MJO） > 定义与背景",
+            "location": "05_热带天气系统/35_马登_朱利安振荡.md",
+            "type": "local_knowledge",
+            "category": "05_热带天气系统",
+            "title": "马登—朱利安振荡（MJO）",
+            "section": "定义与背景"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.6419263482093811,
+          "chunk_id": "867e8ab846350b2f390e234e",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.6419263482093811,
+            "bm25_rank": 1,
+            "bm25_score": 17.734721014162634,
+            "rrf_score": 0.032018442622950824,
+            "rerank_rank": 2,
+            "rerank_score": 0.7897183718870335
+          }
+        },
+        {
+          "content": "# 热带对流组织\n## 影响与表现\n热带对流影响降水带、季风活跃度、热带气旋孕育和全球能量输送。",
+          "source": {
+            "display_name": "知识库：05_热带天气系统 > 热带对流组织 > 影响与表现",
+            "location": "05_热带天气系统/34_热带对流组织.md",
+            "type": "local_knowledge",
+            "category": "05_热带天气系统",
+            "title": "热带对流组织",
+            "section": "影响与表现"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.527708113193512,
+          "chunk_id": "2821e48fbde665fc483d391f",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.527708113193512,
+            "bm25_rank": 3,
+            "bm25_score": 16.122875648738177,
+            "rrf_score": 0.032266458495966696,
+            "rerank_rank": 3,
+            "rerank_score": 0.6570018571100722
+          }
+        },
+        {
+          "content": "# 马登—朱利安振荡（MJO）\n## 形成机制\n它涉及海气相互作用、湿度预调节和热带波动等多种过程，其对流活跃区与被抑制区会随时间传播。",
+          "source": {
+            "display_name": "知识库：05_热带天气系统 > 马登—朱利安振荡（MJO） > 形成机制",
+            "location": "05_热带天气系统/35_马登_朱利安振荡.md",
+            "type": "local_knowledge",
+            "category": "05_热带天气系统",
+            "title": "马登—朱利安振荡（MJO）",
+            "section": "形成机制"
+          },
+          "vector_rank": 11,
+          "retrieval_distance": 0.7959485054016113,
+          "chunk_id": "6ee53a4a214b0e7690b5b522",
+          "fused_rank": 9,
+          "retrieval": {
+            "vector_rank": 11,
+            "retrieval_distance": 0.7959485054016113,
+            "bm25_rank": 10,
+            "bm25_score": 9.326071424208793,
+            "rrf_score": 0.028370221327967807,
+            "rerank_rank": 4,
+            "rerank_score": 0.5159757399913445
+          }
+        }
+      ]
+    },
+    {
+      "id": "atmospheric_river_orographic_rain",
+      "query": "一条狭长的水汽输送带到达地形附近后，为何容易出现强降水？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 0.5,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.25
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 0.5,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.25
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 大气河\n## 形成机制\n海洋蒸发提供水汽，大尺度环流将其集中输送；遇到锋面或地形抬升时，水汽可转化为强降水。",
+          "source": {
+            "display_name": "知识库：04_天气系统与中高纬过程 > 大气河 > 形成机制",
+            "location": "04_天气系统与中高纬过程/31_大气河.md",
+            "type": "local_knowledge",
+            "category": "04_天气系统与中高纬过程",
+            "title": "大气河",
+            "section": "形成机制"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.5164311528205872,
+          "chunk_id": "e2f313bd17bf349463a39ac8",
+          "fused_rank": 6,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.5164311528205872,
+            "rrf_score": 0.01639344262295082,
+            "rerank_rank": 1,
+            "rerank_score": 0.9634840452259559
+          }
+        },
+        {
+          "content": "# 低空急流与强降水\n## 形成机制\n低空急流本身不“制造”水汽，而是能把暖湿空气沿低层快速输送到下游地区，因而可增强水汽平流和水平水汽通量。当急流指向锋面、地形或其他低层边界，且急流出口附近出现水汽辐合时，空气更容易被迫上升；若同时存在不稳定层结和持续的抬升，输送来的水汽便可支持深对流和强降水。\n\n在东亚，850 hPa 低空急流与梅雨/白雨锋相互作用时，常与持续的深对流和强降水环境相关。美国国家气象局的个例复盘也显示，850 hPa 急流可将温暖潮湿气团沿边界向下游输送；该低层输送与高层辐散等其他动力条件共同出现时，环境才更有利于强对流和大雨。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 形成机制",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "形成机制"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.5214543342590332,
+          "chunk_id": "d408bdf04ae6c2ccf323f15a",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.5214543342590332,
+            "bm25_rank": 2,
+            "bm25_score": 8.329057364955164,
+            "rrf_score": 0.03225806451612903,
+            "rerank_rank": 2,
+            "rerank_score": 0.945419497376732
+          }
+        },
+        {
+          "content": "# 低空急流与强降水\n## 影响与表现\n对暴雨研究而言，低空急流最重要的诊断价值通常是三部分：\n\n- **水汽供给**：急流增强低层暖湿空气的平流与输送，使降水系统获得可持续的水汽来源；\n- **触发与维持**：在急流出口、急流轴附近的辐合区，或急流与锋面、地形相遇处，低层辐合和抬升可帮助对流触发或反复生成；\n- **空间和时间定位**：急流轴、急流出口和水汽通量最大区的位置变化，会影响强降水更可能出现在哪里；若系统移动缓慢、对流反复经过同一地区，累积雨量风险更高。\n\n因此，“850 hPa 低空急流与暴雨有关”更准确地说是：它可能通过水汽输送和有利的低层动力配置，为暴雨提供必要环境条件之一，而不是单独构成充分原因。",
+          "source": {
+            "display_name": "知识库：03_大气动力学与环流 > 低空急流与强降水 > 影响与表现",
+            "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+            "type": "local_knowledge",
+            "category": "03_大气动力学与环流",
+            "title": "低空急流与强降水",
+            "section": "影响与表现"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.6272395849227905,
+          "chunk_id": "7fd1cae7675733ca2295ce1e",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.6272395849227905,
+            "bm25_rank": 10,
+            "bm25_score": 6.042227298169557,
+            "rrf_score": 0.029910714285714284,
+            "rerank_rank": 3,
+            "rerank_score": 0.777999433388725
+          }
+        },
+        {
+          "content": "# 暴雨与短时强降水\n## 形成机制\n充足水汽、持续抬升、对流反复生成或缓慢移动、地形作用和中尺度辐合都可增强降水。",
+          "source": {
+            "display_name": "知识库：07_典型气象灾害 > 暴雨与短时强降水 > 形成机制",
+            "location": "07_典型气象灾害/42_暴雨与短时强降水.md",
+            "type": "local_knowledge",
+            "category": "07_典型气象灾害",
+            "title": "暴雨与短时强降水",
+            "section": "形成机制"
+          },
+          "vector_rank": 3,
+          "retrieval_distance": 0.543753445148468,
+          "chunk_id": "f4c07ad24202dae65f395c9a",
+          "fused_rank": 8,
+          "retrieval": {
+            "vector_rank": 3,
+            "retrieval_distance": 0.543753445148468,
+            "rrf_score": 0.015873015873015872,
+            "rerank_rank": 4,
+            "rerank_score": 0.6133230975327517
+          }
+        }
+      ]
+    },
+    {
+      "id": "nighttime_radiation_fog",
+      "query": "夜间地面冷却后，近地面空气为什么可能形成雾？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.25
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.25
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 雾、低云与能见度\n## 形成机制\n辐射冷却、暖湿空气平流到冷地面、蒸发增湿或地形抬升，都可能使近地层达到饱和。",
+          "source": {
+            "display_name": "知识库：02_云_降水与对流 > 雾、低云与能见度 > 形成机制",
+            "location": "02_云_降水与对流/13_雾_低云与能见度.md",
+            "type": "local_knowledge",
+            "category": "02_云_降水与对流",
+            "title": "雾、低云与能见度",
+            "section": "形成机制"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.39517340064048767,
+          "chunk_id": "aa3e7509a4c42d80c59b67a6",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.39517340064048767,
+            "bm25_rank": 1,
+            "bm25_score": 18.075812980263436,
+            "rrf_score": 0.03278688524590164,
+            "rerank_rank": 1,
+            "rerank_score": 0.9248118040759048
+          }
+        },
+        {
+          "content": "# 雾、低云与能见度\n## 定义与背景\n雾是近地面悬浮水滴使能见度显著降低的现象；低云与雾在形成机制上常有连续性。",
+          "source": {
+            "display_name": "知识库：02_云_降水与对流 > 雾、低云与能见度 > 定义与背景",
+            "location": "02_云_降水与对流/13_雾_低云与能见度.md",
+            "type": "local_knowledge",
+            "category": "02_云_降水与对流",
+            "title": "雾、低云与能见度",
+            "section": "定义与背景"
+          },
+          "vector_rank": 3,
+          "retrieval_distance": 0.6402419209480286,
+          "chunk_id": "e05d51eedfa29077d62ef417",
+          "fused_rank": 2,
+          "retrieval": {
+            "vector_rank": 3,
+            "retrieval_distance": 0.6402419209480286,
+            "bm25_rank": 2,
+            "bm25_score": 15.051967244482547,
+            "rrf_score": 0.03200204813108039,
+            "rerank_rank": 2,
+            "rerank_score": 0.47851710464549324
+          }
+        },
+        {
+          "content": "# 大气边界层\n## 形成机制\n白天地表加热加强湍流混合并抬升边界层顶；夜间辐射冷却常形成稳定边界层或逆温。",
+          "source": {
+            "display_name": "知识库：02_云_降水与对流 > 大气边界层 > 形成机制",
+            "location": "02_云_降水与对流/12_大气边界层.md",
+            "type": "local_knowledge",
+            "category": "02_云_降水与对流",
+            "title": "大气边界层",
+            "section": "形成机制"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.634835958480835,
+          "chunk_id": "ba425cf6e681e53fc1de0b29",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.634835958480835,
+            "bm25_rank": 4,
+            "bm25_score": 10.414093234582552,
+            "rrf_score": 0.031754032258064516,
+            "rerank_rank": 3,
+            "rerank_score": 0.4216098203545119
+          }
+        },
+        {
+          "content": "# 大气边界层\n## 影响与表现\n边界层控制近地温湿风、污染扩散、低云雾和对流触发条件。",
+          "source": {
+            "display_name": "知识库：02_云_降水与对流 > 大气边界层 > 影响与表现",
+            "location": "02_云_降水与对流/12_大气边界层.md",
+            "type": "local_knowledge",
+            "category": "02_云_降水与对流",
+            "title": "大气边界层",
+            "section": "影响与表现"
+          },
+          "vector_rank": 7,
+          "retrieval_distance": 0.7669736742973328,
+          "chunk_id": "d8aa8cf269db88e40c5b5b5c",
+          "fused_rank": 11,
+          "retrieval": {
+            "vector_rank": 7,
+            "retrieval_distance": 0.7669736742973328,
+            "rrf_score": 0.014925373134328358,
+            "rerank_rank": 4,
+            "rerank_score": 0.41348688036905423
+          }
+        }
+      ]
+    },
+    {
+      "id": "radar_echo_limit",
+      "query": "雷达回波很强，是否等于地面一定下了同等强度的雨？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 天气雷达观测\n## 适用条件与局限性\n雷达回波不是地面降水量的直接等价物，受距离、遮挡、亮带和粒子类型影响，需要校准与综合判断。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 天气雷达观测 > 适用条件与局限性",
+            "location": "08_观测_预报与不确定性/47_天气雷达观测.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "天气雷达观测",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.5275914669036865,
+          "chunk_id": "68b3c5abdb70f6c3bd227f4b",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.5275914669036865,
+            "bm25_rank": 1,
+            "bm25_score": 10.09349390614408,
+            "rrf_score": 0.03278688524590164,
+            "rerank_rank": 1,
+            "rerank_score": 0.9834180818834469
+          }
+        },
+        {
+          "content": "# 天气雷达观测\n## 形成机制\n雨滴、雪粒和冰雹会散射雷达波；多普勒信息可估计径向速度，双偏振信息可帮助识别粒子类型。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 天气雷达观测 > 形成机制",
+            "location": "08_观测_预报与不确定性/47_天气雷达观测.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "天气雷达观测",
+            "section": "形成机制"
+          },
+          "vector_rank": 5,
+          "retrieval_distance": 0.758685290813446,
+          "chunk_id": "49b9652b4dda77695f9903bc",
+          "fused_rank": 9,
+          "retrieval": {
+            "vector_rank": 5,
+            "retrieval_distance": 0.758685290813446,
+            "rrf_score": 0.015384615384615385,
+            "rerank_rank": 2,
+            "rerank_score": 0.5213548331727418
+          }
+        },
+        {
+          "content": "# 天气雷达观测\n## 影响与表现\n雷达适合监测降水回波和强对流演变，是短时临近预报的重要资料来源。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 天气雷达观测 > 影响与表现",
+            "location": "08_观测_预报与不确定性/47_天气雷达观测.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "天气雷达观测",
+            "section": "影响与表现"
+          },
+          "vector_rank": 3,
+          "retrieval_distance": 0.723929226398468,
+          "chunk_id": "558b4200fa323c019da17e2d",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 3,
+            "retrieval_distance": 0.723929226398468,
+            "bm25_rank": 5,
+            "bm25_score": 8.656022572484186,
+            "rrf_score": 0.03125763125763126,
+            "rerank_rank": 3,
+            "rerank_score": 0.47140577457438804
+          }
+        },
+        {
+          "content": "# 天气雷达观测\n## 定义与背景\n天气雷达通过发射并接收电磁波回波，探测降水粒子的位置、强度和运动。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 天气雷达观测 > 定义与背景",
+            "location": "08_观测_预报与不确定性/47_天气雷达观测.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "天气雷达观测",
+            "section": "定义与背景"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.6793698072433472,
+          "chunk_id": "67722274d1f5b1808a9d9637",
+          "fused_rank": 2,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.6793698072433472,
+            "bm25_rank": 4,
+            "bm25_score": 8.714372052817277,
+            "rrf_score": 0.031754032258064516,
+            "rerank_rank": 4,
+            "rerank_score": 0.4302159484338017
+          }
+        }
+      ]
+    },
+    {
+      "id": "ensemble_uncertainty",
+      "query": "为什么集合预报常给出概率而不是一个确定答案？短临预报又主要依赖什么？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.75
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.75
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 集合预报、临近预报与预报不确定性\n## 影响与表现\n概率预报有助于表达降水、强风和高温等事件的可能性，雷达和卫星资料对短临更新尤其重要。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 集合预报、临近预报与预报不确定性 > 影响与表现",
+            "location": "08_观测_预报与不确定性/50_集合预报_临近预报与预报不确定性.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "集合预报、临近预报与预报不确定性",
+            "section": "影响与表现"
+          },
+          "vector_rank": 2,
+          "retrieval_distance": 0.39332467317581177,
+          "chunk_id": "50bfe044f59e3254b85f0f1c",
+          "fused_rank": 2,
+          "retrieval": {
+            "vector_rank": 2,
+            "retrieval_distance": 0.39332467317581177,
+            "bm25_rank": 1,
+            "bm25_score": 15.742956807481406,
+            "rrf_score": 0.03252247488101534,
+            "rerank_rank": 1,
+            "rerank_score": 0.9507557125401069
+          }
+        },
+        {
+          "content": "# 集合预报、临近预报与预报不确定性\n## 适用条件与局限性\n集合概率不是保证，临近预报对观测质量和系统快速演变敏感；业务决策应使用正式预警信息。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 集合预报、临近预报与预报不确定性 > 适用条件与局限性",
+            "location": "08_观测_预报与不确定性/50_集合预报_临近预报与预报不确定性.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "集合预报、临近预报与预报不确定性",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.3841063380241394,
+          "chunk_id": "0ff17dd1061ddf9a70c8f3be",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.3841063380241394,
+            "bm25_rank": 2,
+            "bm25_score": 14.33820751277253,
+            "rrf_score": 0.03252247488101534,
+            "rerank_rank": 2,
+            "rerank_score": 0.8669527643999851
+          }
+        },
+        {
+          "content": "# 集合预报、临近预报与预报不确定性\n## 形成机制\n大气是混沌系统，微小初始误差会随时间增长。集合成员分歧可作为预报不确定性和风险范围的线索。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 集合预报、临近预报与预报不确定性 > 形成机制",
+            "location": "08_观测_预报与不确定性/50_集合预报_临近预报与预报不确定性.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "集合预报、临近预报与预报不确定性",
+            "section": "形成机制"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.4562215507030487,
+          "chunk_id": "aceaa31e06cf3c8cf6d6002e",
+          "fused_rank": 4,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.4562215507030487,
+            "bm25_rank": 5,
+            "bm25_score": 8.352918105612062,
+            "rrf_score": 0.031009615384615385,
+            "rerank_rank": 3,
+            "rerank_score": 0.7796232594768444
+          }
+        },
+        {
+          "content": "# 集合预报、临近预报与预报不确定性\n## 定义与背景\n集合预报通过多个初始条件或模式配置估计可能结果范围；临近预报强调利用实时观测预测未来数小时的快速天气变化。",
+          "source": {
+            "display_name": "知识库：08_观测_预报与不确定性 > 集合预报、临近预报与预报不确定性 > 定义与背景",
+            "location": "08_观测_预报与不确定性/50_集合预报_临近预报与预报不确定性.md",
+            "type": "local_knowledge",
+            "category": "08_观测_预报与不确定性",
+            "title": "集合预报、临近预报与预报不确定性",
+            "section": "定义与背景"
+          },
+          "vector_rank": 3,
+          "retrieval_distance": 0.4160012900829315,
+          "chunk_id": "f4d050aed71b331a5a7b595c",
+          "fused_rank": 3,
+          "retrieval": {
+            "vector_rank": 3,
+            "retrieval_distance": 0.4160012900829315,
+            "bm25_rank": 4,
+            "bm25_score": 9.684299436060561,
+            "rrf_score": 0.03149801587301587,
+            "rerank_rank": 4,
+            "rerank_score": 0.7298508110830305
+          }
+        }
+      ]
+    },
+    {
+      "id": "unstable_air_not_sufficient",
+      "query": "空气不稳定是不是就一定会出现强对流？",
+      "before": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "after": {
+        "hit_at_k": true,
+        "reciprocal_rank": 1.0,
+        "coverage_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "labelled_noise_at_k": 0.0,
+        "judgement_coverage_at_k": 0.5
+      },
+      "before_count": 4,
+      "after_count": 4,
+      "candidates": [
+        {
+          "content": "# 对流触发条件与发展\n## 适用条件与局限性\n具备不稳定不代表一定成对流；抑制层、干空气侵入和风场条件都可能改变结果。",
+          "source": {
+            "display_name": "知识库：02_云_降水与对流 > 对流触发条件与发展 > 适用条件与局限性",
+            "location": "02_云_降水与对流/09_对流触发条件与发展.md",
+            "type": "local_knowledge",
+            "category": "02_云_降水与对流",
+            "title": "对流触发条件与发展",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 1,
+          "retrieval_distance": 0.4092244803905487,
+          "chunk_id": "d6d0ad8eae1eaa9c32dab0ac",
+          "fused_rank": 1,
+          "retrieval": {
+            "vector_rank": 1,
+            "retrieval_distance": 0.4092244803905487,
+            "bm25_rank": 1,
+            "bm25_score": 12.95786146562949,
+            "rrf_score": 0.03278688524590164,
+            "rerank_rank": 1,
+            "rerank_score": 0.9875551499320754
+          }
+        },
+        {
+          "content": "# 大气稳定度与直减率\n## 适用条件与局限性\n稳定度只是对流条件之一，还需要水汽、抬升触发和风场结构共同配合。",
+          "source": {
+            "display_name": "知识库：01_基础大气与热力学 > 大气稳定度与直减率 > 适用条件与局限性",
+            "location": "01_基础大气与热力学/06_大气稳定度与直减率.md",
+            "type": "local_knowledge",
+            "category": "01_基础大气与热力学",
+            "title": "大气稳定度与直减率",
+            "section": "适用条件与局限性"
+          },
+          "vector_rank": 4,
+          "retrieval_distance": 0.5697889924049377,
+          "chunk_id": "fe1dd13671c5e788a368f35c",
+          "fused_rank": 10,
+          "retrieval": {
+            "vector_rank": 4,
+            "retrieval_distance": 0.5697889924049377,
+            "rrf_score": 0.015625,
+            "rerank_rank": 2,
+            "rerank_score": 0.8557927439549482
+          }
+        },
+        {
+          "content": "# 大气稳定度与直减率\n## 影响与表现\n不稳定环境更利于深对流和阵雨雷暴；稳定层结更容易出现层云、雾或污染物扩散受限。",
+          "source": {
+            "display_name": "知识库：01_基础大气与热力学 > 大气稳定度与直减率 > 影响与表现",
+            "location": "01_基础大气与热力学/06_大气稳定度与直减率.md",
+            "type": "local_knowledge",
+            "category": "01_基础大气与热力学",
+            "title": "大气稳定度与直减率",
+            "section": "影响与表现"
+          },
+          "vector_rank": 3,
+          "retrieval_distance": 0.5489530563354492,
+          "chunk_id": "a030e277c2ea3c9feb22aaee",
+          "fused_rank": 2,
+          "retrieval": {
+            "vector_rank": 3,
+            "retrieval_distance": 0.5489530563354492,
+            "bm25_rank": 3,
+            "bm25_score": 10.289205868812296,
+            "rrf_score": 0.031746031746031744,
+            "rerank_rank": 3,
+            "rerank_score": 0.8517553632553838
+          }
+        },
+        {
+          "content": "# 对流触发条件与发展\n## 形成机制\n典型条件包括充足水汽、不稳定层结和抬升机制。锋面、地形、海陆风辐合或旧对流外流边界都可能提供抬升。",
+          "source": {
+            "display_name": "知识库：02_云_降水与对流 > 对流触发条件与发展 > 形成机制",
+            "location": "02_云_降水与对流/09_对流触发条件与发展.md",
+            "type": "local_knowledge",
+            "category": "02_云_降水与对流",
+            "title": "对流触发条件与发展",
+            "section": "形成机制"
+          },
+          "vector_rank": 6,
+          "retrieval_distance": 0.573352038860321,
+          "chunk_id": "b4e0762b504a49f2297eea45",
+          "fused_rank": 5,
+          "retrieval": {
+            "vector_rank": 6,
+            "retrieval_distance": 0.573352038860321,
+            "bm25_rank": 10,
+            "bm25_score": 5.379887906924897,
+            "rrf_score": 0.029437229437229435,
+            "rerank_rank": 4,
+            "rerank_score": 0.697541406096208
+          }
+        }
+      ]
+    }
+  ],
+  "before": {
+    "hit_rate": 1.0,
+    "mrr": 0.9583333333333334,
+    "coverage": 0.8888888888888888
+  },
+  "after": {
+    "hit_rate": 1.0,
+    "mrr": 0.9583333333333334,
+    "coverage": 0.8888888888888888
+  }
+}

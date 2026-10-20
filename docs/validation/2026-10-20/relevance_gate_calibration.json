@@ -1,0 +1,283 @@
+{
+  "generated_at": "2026-10-20T10:02:42.627730+08:00",
+  "model": "qwen3.7-text-rerank",
+  "threshold": 0.07,
+  "rows": [
+    {
+      "case_id": "high_train",
+      "split": "calibration",
+      "query": "副热带高压为什么常带来高温少雨？",
+      "source": [
+        "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "影响与表现"
+      ],
+      "relevant": true,
+      "score": 0.9756825177755648
+    },
+    {
+      "case_id": "high_train",
+      "split": "calibration",
+      "query": "副热带高压为什么常带来高温少雨？",
+      "source": [
+        "06_气候系统与气候变化/39_ENSO.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.0175631287668489
+    },
+    {
+      "case_id": "high_train",
+      "split": "calibration",
+      "query": "副热带高压为什么常带来高温少雨？",
+      "source": [
+        "05_热带天气系统/35_马登_朱利安振荡.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.011508634327054734
+    },
+    {
+      "case_id": "jet_train",
+      "split": "calibration",
+      "query": "低空急流怎样输送水汽并支持暴雨？",
+      "source": [
+        "03_大气动力学与环流/23_低空急流与强降水.md",
+        "形成机制"
+      ],
+      "relevant": true,
+      "score": 0.9999999999997
+    },
+    {
+      "case_id": "jet_train",
+      "split": "calibration",
+      "query": "低空急流怎样输送水汽并支持暴雨？",
+      "source": [
+        "06_气候系统与气候变化/39_ENSO.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.002834942901722648
+    },
+    {
+      "case_id": "jet_train",
+      "split": "calibration",
+      "query": "低空急流怎样输送水汽并支持暴雨？",
+      "source": [
+        "04_天气系统与中高纬过程/29_寒潮与冷空气活动.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.000811466296967378
+    },
+    {
+      "case_id": "weather_train",
+      "split": "calibration",
+      "query": "北京现在的气温、风向和云量是多少？",
+      "source": [
+        "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "影响与表现"
+      ],
+      "relevant": false,
+      "score": 0.061060037966502334
+    },
+    {
+      "case_id": "weather_train",
+      "split": "calibration",
+      "query": "北京现在的气温、风向和云量是多少？",
+      "source": [
+        "04_天气系统与中高纬过程/29_寒潮与冷空气活动.md",
+        "影响与表现"
+      ],
+      "relevant": false,
+      "score": 0.05838976467978607
+    },
+    {
+      "case_id": "river_train",
+      "split": "calibration",
+      "query": "大气河遇到地形为什么容易带来强降水？",
+      "source": [
+        "04_天气系统与中高纬过程/31_大气河.md",
+        "形成机制"
+      ],
+      "relevant": true,
+      "score": 0.9712517266575512
+    },
+    {
+      "case_id": "river_train",
+      "split": "calibration",
+      "query": "大气河遇到地形为什么容易带来强降水？",
+      "source": [
+        "06_气候系统与气候变化/39_ENSO.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.0033219964384794687
+    },
+    {
+      "case_id": "river_train",
+      "split": "calibration",
+      "query": "大气河遇到地形为什么容易带来强降水？",
+      "source": [
+        "04_天气系统与中高纬过程/29_寒潮与冷空气活动.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.0008022543365587276
+    },
+    {
+      "case_id": "high_holdout",
+      "split": "holdout",
+      "query": "高压是不是必然导致高温干旱？",
+      "source": [
+        "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "适用条件与局限性"
+      ],
+      "relevant": true,
+      "score": 0.9999998135773523
+    },
+    {
+      "case_id": "high_holdout",
+      "split": "holdout",
+      "query": "高压是不是必然导致高温干旱？",
+      "source": [
+        "05_热带天气系统/35_马登_朱利安振荡.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.1355453061021596
+    },
+    {
+      "case_id": "high_holdout",
+      "split": "holdout",
+      "query": "高压是不是必然导致高温干旱？",
+      "source": [
+        "06_气候系统与气候变化/39_ENSO.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.048769565103666424
+    },
+    {
+      "case_id": "enso_holdout",
+      "split": "holdout",
+      "query": "ENSO 是如何形成的？",
+      "source": [
+        "06_气候系统与气候变化/39_ENSO.md",
+        "形成机制"
+      ],
+      "relevant": true,
+      "score": 0.9996136355222391
+    },
+    {
+      "case_id": "enso_holdout",
+      "split": "holdout",
+      "query": "ENSO 是如何形成的？",
+      "source": [
+        "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "影响与表现"
+      ],
+      "relevant": false,
+      "score": 0.020194128949098167
+    },
+    {
+      "case_id": "enso_holdout",
+      "split": "holdout",
+      "query": "ENSO 是如何形成的？",
+      "source": [
+        "04_天气系统与中高纬过程/29_寒潮与冷空气活动.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.0023405669471391333
+    },
+    {
+      "case_id": "jet_holdout",
+      "split": "holdout",
+      "query": "850 hPa 低空急流怎样影响强降水？",
+      "source": [
+        "03_大气动力学与环流/23_低空急流与强降水.md",
+        "影响与表现"
+      ],
+      "relevant": true,
+      "score": 0.9973966343593403
+    },
+    {
+      "case_id": "jet_holdout",
+      "split": "holdout",
+      "query": "850 hPa 低空急流怎样影响强降水？",
+      "source": [
+        "05_热带天气系统/35_马登_朱利安振荡.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.013073452942902741
+    },
+    {
+      "case_id": "jet_holdout",
+      "split": "holdout",
+      "query": "850 hPa 低空急流怎样影响强降水？",
+      "source": [
+        "06_气候系统与气候变化/39_ENSO.md",
+        "定义与背景"
+      ],
+      "relevant": false,
+      "score": 0.010330448981175078
+    },
+    {
+      "case_id": "weather_holdout",
+      "split": "holdout",
+      "query": "上海此刻下雨了吗，当前温度是多少？",
+      "source": [
+        "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "影响与表现"
+      ],
+      "relevant": false,
+      "score": 0.13911800706494887
+    },
+    {
+      "case_id": "weather_holdout",
+      "split": "holdout",
+      "query": "上海此刻下雨了吗，当前温度是多少？",
+      "source": [
+        "04_天气系统与中高纬过程/29_寒潮与冷空气活动.md",
+        "影响与表现"
+      ],
+      "relevant": false,
+      "score": 0.10427363479777757
+    }
+  ],
+  "errors": [],
+  "before": {
+    "calibration": {
+      "positive_count": 3,
+      "negative_count": 8,
+      "false_rejects": 0,
+      "false_accepts": 8,
+      "accepted_noise_ratio": 0.7272727272727273
+    },
+    "holdout": {
+      "positive_count": 3,
+      "negative_count": 8,
+      "false_rejects": 0,
+      "false_accepts": 8,
+      "accepted_noise_ratio": 0.7272727272727273
+    }
+  },
+  "after": {
+    "calibration": {
+      "positive_count": 3,
+      "negative_count": 8,
+      "false_rejects": 0,
+      "false_accepts": 0,
+      "accepted_noise_ratio": 0.0
+    },
+    "holdout": {
+      "positive_count": 3,
+      "negative_count": 8,
+      "false_rejects": 0,
+      "false_accepts": 3,
+      "accepted_noise_ratio": 0.5
+    }
+  },
+  "scope": "小型显式正负 query-passage 对；非完整检索候选分布，非独立人工盲测。"
+}

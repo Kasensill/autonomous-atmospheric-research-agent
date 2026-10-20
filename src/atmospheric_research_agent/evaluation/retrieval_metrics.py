@@ -27,6 +27,9 @@ class RetrievalMetrics:
     reciprocal_rank: float
     coverage_at_k: float
     first_relevant_rank: int | None
+    # 仅显式负标签计入噪声；未标注不等于不相关，需同时看标注覆盖。
+    labelled_noise_at_k: float = 0.0
+    judgement_coverage_at_k: float = 0.0
 
 
 def source_reference_from_candidate(candidate: dict[str, Any]) -> SourceReference | None:
@@ -49,6 +52,7 @@ def calculate_retrieval_metrics(
     expected_sources: Iterable[SourceReference],
     *,
     top_k: int,
+    irrelevant_sources: Iterable[SourceReference] = (),
 ) -> RetrievalMetrics:
     """计算 Hit@K、MRR@K 和 Coverage@K。
 
@@ -64,11 +68,8 @@ def calculate_retrieval_metrics(
     if not expected:
         raise ValueError("expected_sources 至少需要一个人工标注的相关来源。")
 
-    retrieved = [
-        reference
-        for candidate in candidates[:top_k]
-        if (reference := source_reference_from_candidate(candidate)) is not None
-    ]
+    retrieved = [source_reference_from_candidate(candidate) for candidate in candidates[:top_k]]
+    irrelevant = set(irrelevant_sources)
     relevant_ranks = [
         rank
         for rank, reference in enumerate(retrieved, start=1)
@@ -82,6 +83,8 @@ def calculate_retrieval_metrics(
         reciprocal_rank=(1 / first_relevant_rank) if first_relevant_rank else 0.0,
         coverage_at_k=len(covered) / len(expected),
         first_relevant_rank=first_relevant_rank,
+        labelled_noise_at_k=sum(ref in irrelevant for ref in retrieved) / max(1, len(retrieved)),
+        judgement_coverage_at_k=sum(ref in expected | irrelevant for ref in retrieved) / max(1, len(retrieved)),
     )
 
 

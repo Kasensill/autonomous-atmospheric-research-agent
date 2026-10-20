@@ -1,6 +1,8 @@
 """指定地区的当前天气查询工具（Open-Meteo）。"""
 
 import json
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -146,6 +148,13 @@ def query_current_weather(location: str) -> dict[str, Any]:
         "weather_description": WEATHER_CODE_LABELS.get(weather_code, f"天气代码 {weather_code}"),
     }
     evidence_text = _weather_evidence_text(resolved_location, current, timezone)
+    try:
+        valid_time = datetime.fromisoformat(current["time"])
+        if valid_time.tzinfo is None:
+            valid_time = valid_time.replace(tzinfo=ZoneInfo(timezone))
+        valid_at = valid_time.isoformat()
+    except (KeyError, ValueError, TypeError):
+        valid_at = None
     return {
         "status": "success",
         "tool": "get_current_weather",
@@ -155,6 +164,8 @@ def query_current_weather(location: str) -> dict[str, Any]:
         "observed_at": current.get("time"),
         "current": normalized_current,
         "evidence_text": evidence_text,
+        "valid_at": valid_at,
+        "fetched_at": datetime.now(UTC).isoformat(),
         "source": {
             "display_name": f"Open-Meteo 当前条件：{resolved_location['name']}",
             "location": weather_url,

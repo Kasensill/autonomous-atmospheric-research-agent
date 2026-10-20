@@ -120,3 +120,12 @@ def rerank_fused_candidates(
         }
         reranked_candidates.append(candidate)
     return reranked_candidates
+
+
+def filter_relevance(candidates: list[dict[str, Any]], threshold: float) -> list[dict[str, Any]]:
+    """仅过滤有合法 rerank 分数的候选；降级无分数路径由调用方明确标记。"""
+    import math
+    return [item for item in candidates
+            if isinstance(item.get("retrieval", {}).get("rerank_score"), (int, float))
+            and math.isfinite(item["retrieval"]["rerank_score"])
+            and item["retrieval"]["rerank_score"] >= threshold]

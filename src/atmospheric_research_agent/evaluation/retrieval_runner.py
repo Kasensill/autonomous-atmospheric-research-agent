@@ -108,7 +108,8 @@ def evaluate_cases(
                     StrategyCaseResult(
                         strategy=strategy,
                         metrics=calculate_retrieval_metrics(
-                            candidates, case.expected_sources, top_k=top_k
+                            candidates, case.expected_sources, top_k=top_k,
+                            irrelevant_sources=case.irrelevant_sources,
                         ),
                         candidate_count=len(candidates),
                     )
@@ -146,6 +147,8 @@ def summarize_results(results: Iterable[RetrievalCaseResult]) -> dict[str, dict[
                 "successful_cases": len(successful_metrics),
                 "failed_cases": failures[strategy],
                 **mean_metrics(successful_metrics),
+                "labelled_noise": sum(m.labelled_noise_at_k for m in successful_metrics) / len(successful_metrics),
+                "judgement_coverage": sum(m.judgement_coverage_at_k for m in successful_metrics) / len(successful_metrics),
             }
         else:
             summary[strategy] = {"successful_cases": 0, "failed_cases": failures[strategy]}
@@ -158,6 +161,7 @@ def _metric_cell(result: StrategyCaseResult) -> str:
     return (
         f"Hit={int(result.metrics.hit_at_k)} | MRR={result.metrics.reciprocal_rank:.2f}"
         f" | Cov={result.metrics.coverage_at_k:.2f}"
+        f" | 已标噪声={result.metrics.labelled_noise_at_k:.2f} | 标注覆盖={result.metrics.judgement_coverage_at_k:.2f}"
     )
 
 

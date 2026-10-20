@@ -90,3 +90,13 @@ def test_legacy_weather_memory_not_recalled_and_file_is_preserved(tmp_path):
     save_project_memory({"question": "北京天气分析", "summary": "北京气温", "source_locations": ["https://api.open-meteo.com/v1/forecast"]}, store_path=path)
     assert recall_project_memory("北京天气分析", store_path=path) == []
     assert "open-meteo" in path.read_text(encoding="utf-8")
+
+
+def test_verified_full_non_weather_report_still_writes_memory(monkeypatch):
+    saved = []
+    monkeypatch.setattr(nodes, "save_project_memory", saved.append)
+    state = create_initial_state("副高机制")
+    state.update(final_report="下沉抑制云雨", report_review={"verdict": "pass"},
+                 assessment={"sufficient": True, "next_step": "full_report"})
+    assert nodes.store_memory_node(state)["trace"][0]["event"] == "memory_stored"
+    assert len(saved) == 1
