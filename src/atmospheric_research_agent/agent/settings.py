@@ -5,12 +5,31 @@
 另一条独立的数据准备流程。
 """
 
+from collections.abc import Mapping
+from typing import Any
+
 # 图与研究循环预算：防止模型反复调用工具或让图无限循环。
 MAX_RESEARCH_ROUNDS = 3
 MAX_TOOL_CALLS = 8
 GRAPH_RECURSION_LIMIT = 30
 # 报告最多接受一次受控修订；避免 Reflection 让图在写作与自检间无限循环。
 MAX_REPORT_REVISION_ROUNDS = 1
+
+
+def research_rounds_exhausted(state: Mapping[str, Any]) -> bool:
+    """研究轮次上限；单独提供以保持预算 Trace 的具体原因。"""
+    return state.get("research_round", 0) >= MAX_RESEARCH_ROUNDS
+
+
+def research_budget_exhausted(state: Mapping[str, Any]) -> bool:
+    """任一研究预算达到上限即耗尽。"""
+    return research_rounds_exhausted(state) or state.get("tool_call_count", 0) >= MAX_TOOL_CALLS
+
+
+def tool_batch_fits_budget(state: Mapping[str, Any], requested_count: int) -> bool:
+    """完整批次可容纳且研究轮次未满时，才允许执行工具。"""
+    return (not research_rounds_exhausted(state)
+            and state.get("tool_call_count", 0) + requested_count <= MAX_TOOL_CALLS)
 
 # V2.1 项目记忆：只召回少量相关、已核验报告摘要；不是本次报告的正式证据。
 MEMORY_RECALL_LIMIT = 3

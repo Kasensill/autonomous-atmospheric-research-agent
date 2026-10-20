@@ -29,7 +29,8 @@ from .nodes import (
     verify_report_node,
 )
 from .state import ResearchState
-from .settings import MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
+from .settings import (MAX_TOOL_CALLS, research_budget_exhausted,
+                       research_rounds_exhausted, tool_batch_fits_budget)
 
 
 def _utc_now() -> str:
@@ -76,14 +77,12 @@ def _instrument_node(node_name: str, node: Callable[[ResearchState], dict[str, A
             reason = "结构化决策与程序规则"
             if node_name == "agent" and destination == "research_guard":
                 latest = next((m for m in reversed(merged["messages"]) if hasattr(m, "tool_calls")), None)
-                if latest and latest.tool_calls:
-                    reason = ("研究轮次耗尽，本批工具请求未执行" if merged.get("research_round", 0) >= MAX_RESEARCH_ROUNDS
+                if latest and latest.tool_calls and not tool_batch_fits_budget(merged, len(latest.tool_calls)):
+                    reason = ("研究轮次耗尽，本批工具请求未执行" if research_rounds_exhausted(merged)
                               else "本批工具请求将超过工具调用上限，未执行")
-                    code = "research_rounds_exhausted" if merged.get("research_round", 0) >= MAX_RESEARCH_ROUNDS else "tool_batch_exceeds_budget"
+                    code = "research_rounds_exhausted" if research_rounds_exhausted(merged) else "tool_batch_exceeds_budget"
                     update["program_limitations"] = list(dict.fromkeys([*state.get("program_limitations", []), code]))
-            if node_name in {"research_guard", "assess_evidence"} and (
-                merged.get("research_round", 0) >= MAX_RESEARCH_ROUNDS or merged.get("tool_call_count", 0) >= MAX_TOOL_CALLS
-            ):
+            if node_name in {"research_guard", "assess_evidence"} and research_budget_exhausted(merged):
                 update["program_limitations"] = list(dict.fromkeys([*state.get("program_limitations", []), "budget_exhausted"]))
             business_trace.append({"node": node_name, "event": "route_decision",
                                    "detail": f"下一节点：{destination}；{reason}。",

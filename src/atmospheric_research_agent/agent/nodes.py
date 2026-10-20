@@ -26,6 +26,8 @@ from .settings import (
     MAX_RESEARCH_ROUNDS,
     MAX_TOOL_CALLS,
     BRIEF_REPORT_MAX_CHARACTERS,
+    research_budget_exhausted,
+    tool_batch_fits_budget,
 )
 from .memory import make_memory_record, recall_project_memory, save_project_memory, is_time_sensitive_question
 from .state import (
@@ -330,9 +332,7 @@ def route_after_agent(
         # research_round 以已执行的一批工具为单位计数。达到上限后不允许模型再
         # 发起下一批工具；先经过守卫确认已有正式证据，避免“预算为 3 却执行第
         # 4 轮”，也避免零证据时直接写报告。
-        if state.get("research_round", 0) >= MAX_RESEARCH_ROUNDS:
-            return "research_guard"
-        if state.get("tool_call_count", 0) + requested_count > MAX_TOOL_CALLS:
+        if not tool_batch_fits_budget(state, requested_count):
             return "research_guard"
         return "tools"
     if state.get("clarification_question"):
@@ -611,10 +611,7 @@ def route_after_research_guard(
 
     if usable_evidence(state):
         return "assess_evidence"
-    if (
-        state.get("research_round", 0) >= MAX_RESEARCH_ROUNDS
-        or state.get("tool_call_count", 0) >= MAX_TOOL_CALLS
-    ):
+    if research_budget_exhausted(state):
         return "finalize_limited_report"
     return "agent"
 
@@ -719,10 +716,7 @@ def route_after_evidence_assessment(
         return "request_clarification"
     if next_step in {"full_report", "limited_report"}:
         return "generate_draft"
-    if (
-        state.get("research_round", 0) >= MAX_RESEARCH_ROUNDS
-        or state.get("tool_call_count", 0) >= MAX_TOOL_CALLS
-    ):
+    if research_budget_exhausted(state):
         return "generate_draft"
     return "agent"
 
