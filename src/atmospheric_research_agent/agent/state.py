@@ -175,8 +175,10 @@ class ResearchState(TypedDict, total=False):
     # Evidence Review 节点的最近一次判断；决定继续、澄清还是进入报告阶段。
     assessment: EvidenceAssessment
 
-    # 只有用户才能提供关键条件时的追问；不为空时本轮在 request_clarification 结束。
+    # 只有用户才能提供关键条件时的追问；在 request_clarification 暂停，回答后清空。
     clarification_question: str | None
+    # 同一任务内已完成的追问与回答；追加保存，供研究和报告阶段理解补充条件。
+    clarification_history: Annotated[list[dict[str, str]], add]
 
     # 最终交付给用户的报告；只有 finalize 节点可写入，草稿不能直接写这里。
     final_report: str | None
@@ -217,6 +219,7 @@ def create_initial_state(question: str) -> ResearchState:
         "research_round": 0,
         "tool_call_count": 0,
         "clarification_question": None,
+        "clarification_history": [],
         "final_report": None,
         "draft_report": None,
         "report_revision_count": 0,

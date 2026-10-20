@@ -7,24 +7,38 @@ import sys
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
+from collections.abc import Callable
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
 
 from .graph import build_research_graph
 from .settings import GRAPH_RECURSION_LIMIT
 from .state import ResearchState, create_initial_state
 
 
-def run_research(question: str) -> ResearchState:
-    """从初始 State 开始执行整张研究图，并返回最终 State。"""
+def run_research(question: str, *, answer_provider: Callable[[str], str] | None = None) -> ResearchState:
+    """同进程运行与恢复；没有回答接收器时将暂停结果返回给调用者。"""
 
-    graph = build_research_graph()
+    graph = build_research_graph(checkpointer=InMemorySaver())
     initial_state = create_initial_state(question)
     started = perf_counter()
-    result: ResearchState = graph.invoke(
-        initial_state,
-        config={"recursion_limit": GRAPH_RECURSION_LIMIT},
-    )
+    config = {"recursion_limit": GRAPH_RECURSION_LIMIT,
+              "configurable": {"thread_id": initial_state["run_id"]}}
+    result = graph.invoke(initial_state, config=config)
+    waiting_seconds = 0.0
+    while result.get("__interrupt__"):
+        if answer_provider is None:
+            # 未完成任务不能写 finished_at 或 run_completed。
+            return result
+        prompt = result["__interrupt__"][0].value["question"]
+        waiting_started = perf_counter()
+        answer = answer_provider(prompt)
+        while not isinstance(answer, str) or not answer.strip():
+            answer = answer_provider("回答不能为空。" + prompt)
+        waiting_seconds += perf_counter() - waiting_started
+        result = graph.invoke(Command(resume=answer.strip()), config=config)
     finished_at = datetime.now(UTC).isoformat()
-    duration_ms = round((perf_counter() - started) * 1000, 2)
+    duration_ms = round((perf_counter() - started - waiting_seconds) * 1000, 2)
     result["finished_at"] = finished_at
     result["run_duration_ms"] = duration_ms
     result.setdefault("run_id", initial_state["run_id"])
@@ -121,7 +135,15 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="额外显示研究轮次、工具数和运行轨迹。")
     arguments = parser.parse_args()
 
-    result = run_research(arguments.question)
+    def read_answer(question: str) -> str:
+        print(f"\n# 等待补充信息\n{question}\n当前任务已暂停，已有资料和预算保留。")
+        return input("你的回答：")
+
+    try:
+        result = run_research(arguments.question, answer_provider=read_answer)
+    except (EOFError, KeyboardInterrupt):
+        print("\n已退出。本版检查点仅在内存中，关闭进程后不能恢复。")
+        return
     print(format_final_result(result, debug=arguments.debug))
 
 

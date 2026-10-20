@@ -91,7 +91,7 @@ def _instrument_node(node_name: str, node: Callable[[ResearchState], dict[str, A
     return instrumented_node
 
 
-def build_research_graph() -> Any:
+def build_research_graph(*, checkpointer: Any = None) -> Any:
     """构建一张可执行的图；模型和工具仅在 invoke 时才会真正调用。"""
 
     # 当前 V2 的完整研究流程图：
@@ -110,7 +110,7 @@ def build_research_graph() -> Any:
     #   │
     #   ├── 缺少用户才能提供的信息 ────→ request_clarification
     #   │                                  ↓
-    #   │                                END：等待用户补充信息
+    #   │                                interrupt：等待回答，恢复后回 agent
     #   │
     #   └── 暂不调用工具 / 新工具调用超预算 → research_guard
     #                                      │
@@ -119,7 +119,7 @@ def build_research_graph() -> Any:
     #                                      └── evidence 非空 → assess_evidence
     #                                                               │
     #                                                               ├── continue → agent
-    #                                                               ├── clarify → request_clarification → END：等待用户
+    #                                                               ├── clarify → request_clarification → 暂停/恢复 → agent
     #                                                               └── full_report / limited_report
     #                                                                            → generate_draft
     #                                                                                 ↓
@@ -170,7 +170,7 @@ def build_research_graph() -> Any:
         _instrument_node("finalize_limited_report", finalize_limited_report_node),
     )
 
-    # 人在回路：保留具体追问，以“等待用户补充信息”结束本轮任务。
+    # 人在回路：保存具体追问并暂停；同一 thread 恢复后接着研究。
     builder.add_node(
         "request_clarification",
         _instrument_node("request_clarification", request_clarification_node),
@@ -236,6 +236,6 @@ def build_research_graph() -> Any:
     builder.add_edge("finalize_report", "store_memory")
     builder.add_edge("store_memory", END)
     builder.add_edge("finalize_limited_report", END)
-    builder.add_edge("request_clarification", END)
+    builder.add_edge("request_clarification", "agent")
 
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)

@@ -441,14 +441,17 @@ def test_limited_finalization_withholds_unverified_draft() -> None:
     assert "不应交付的草稿" not in update["final_report"]
 
 
-def test_request_clarification_records_waiting_state() -> None:
+def test_request_clarification_records_answer(monkeypatch) -> None:
+    import atmospheric_research_agent.agent.nodes as nodes
+    monkeypatch.setattr(nodes, "interrupt", lambda payload: "北京")
     state = create_initial_state("北京现在天气如何？")
     state["clarification_question"] = "请提供你想查询的具体地点。"
 
     update = request_clarification_node(state)
 
-    assert update["trace"][0]["event"] == "waiting_for_user_information"
-    assert "具体地点" in update["trace"][0]["detail"]
+    assert update["trace"][0]["event"] == "clarification_received"
+    assert update["clarification_question"] is None
+    assert update["clarification_history"][0]["answer"] == "北京"
 
 
 def test_clarify_decision_requires_a_question() -> None:

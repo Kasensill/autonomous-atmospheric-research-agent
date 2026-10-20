@@ -3,7 +3,7 @@
 一个面向大气科学领域的学习型 Research Agent。它的目标不是“搜索后直接总结”，而是
 把问题、工具调用、证据、评估和带来源的报告串成一条可解释的 LangGraph 工作流。
 
-## 当前状态：V1 核心闭环已完成
+## 当前状态：研究闭环、报告核验与同任务 HITL 已实现
 
 V1 已具备真实的本地知识库、外部工具调用与证据驱动报告能力。它仍是学习项目，
 不应被视为科学结论生产系统或天气预警系统。
@@ -11,7 +11,9 @@ V1 已具备真实的本地知识库、外部工具调用与证据驱动报告�
 ```text
 用户问题
   ↓
-agent ── 缺少用户关键信息 ──→ request_clarification ──→ END（等待用户）
+recall_memory → agent ── 缺少用户关键信息 ──→ request_clarification
+                 ↑                            │
+                 └── 回答写入原任务 ← interrupt 暂停／Command 恢复
   │
   ├── 请求工具 ──→ tools ──→ record_results ──→ agent
   │                    │
@@ -22,8 +24,13 @@ agent ── 缺少用户关键信息 ──→ request_clarification ──→ 
                               ├── 有证据 ──→ assess_evidence
                               │                  ├── 继续研究 ──→ agent
                               │                  ├── 需要澄清 ──→ request_clarification
-                              │                  └── 可报告 ──→ generate_report ──→ END
-                              └── 预算耗尽 ──→ generate_report（受限结论）──→ END
+                              │                  └── 完整／部分结论 ──→ generate_draft
+                              └── 零证据且预算耗尽 ──→ finalize_limited_report → END
+
+generate_draft → verify_report
+                   ├── pass → finalize_report → store_memory → END
+                   ├── revise 且有额度 → revise_report → verify_report
+                   └── 修订耗尽 → finalize_limited_report → END
 ```
 
 ## 可用工具
@@ -94,6 +101,18 @@ DeepSeek 的 Agent Tool Calling 明确关闭思考模式：该 API 模式要求�
 
 ## 运行研究
 
+完整交互入口，首次问题与澄清回答均由用户输入，调用真实模型和工具：
+
+```powershell
+.venv\Scripts\python examples/05_interactive_research.py
+```
+
+正式模块入口也支持追问后继续：缺少地点等必要信息时会在当前终端等待回答，不需要重新发起任务。
+HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command(resume=...)`。
+恢复保留证据、消息、记忆、研究轮次与工具计数；回答追加到消息和澄清记录，传给评估、写作与核验。
+人工等待时间不计入执行耗时。退出进程后不能恢复；尚未加入 SQLite、前置意图节点或旧证据自动筛选。
+设计与验证详情见 [最小 HITL 说明](docs/architecture/HITL_minimal.md)。
+
 只使用内部知识库：
 
 ```powershell
@@ -111,7 +130,7 @@ DeepSeek 的 Agent Tool Calling 明确关闭思考模式：该 API 模式要求�
 ## 测试
 
 ```powershell
-.venv\Scripts\python -m pytest
+.venv\Scripts\python -m pytest --basetemp .pytest-tmp
 ```
 
 测试不发送真实模型请求、不访问 Tavily，也不读取公开网页；外部依赖都由假对象替代。
@@ -125,7 +144,7 @@ DeepSeek 的 Agent Tool Calling 明确关闭思考模式：该 API 模式要求�
   本地命令行可读版本，尚未接入数据库、监控平台、告警或成本仪表盘。
 - 网页正文读取具有 V1 基础的 URL 安全过滤；不等于生产级的全量 SSRF 防护。
 - 当前 Task Memory 只保存已通过核验报告的项目摘要，并按轻量词项召回；它是跨运行背景，绝不是
-  本次可引用的正式 evidence，也尚未实现数据库、跨用户隔离或任务中断恢复。
+  本次可引用的正式 evidence，也尚未实现数据库或跨用户隔离。任务恢复另由内存检查点负责，不能跨进程。
 
 当前确定的核心 Agent 学习与实现顺序如下。每一阶段都建立在前一阶段已经可运行、可观察的基础上，
 避免为了堆叠概念而过早引入复杂架构：
@@ -136,6 +155,9 @@ DeepSeek 的 Agent Tool Calling 明确关闭思考模式：该 API 模式要求�
    决定定稿、受控修订或安全降级；另有最小人工标注评测集。
 3. **V2.1：Task Memory 与 Observability（第一版已完成）**：每次运行有 run_id、Trace、节点耗时与总耗时；
    已通过核验的报告摘要会保存为本地项目记忆，并在后续相关任务开始时作为背景召回。
+   **HITL 增量（2026-10-20）**：两个澄清入口接入同任务暂停恢复；证据评估的澄清必须提供具体追问。
+   完整离线回归 94 项通过；2026-10-19 的一次真实模型验收完成地点追问、北京回答、天气取证及报告交付。
+   这是机制验收，不证明模型永不重复提问、数据永不过期或报告科学结论绝对正确。
 4. **V3：Multi-Agent（设计中）**：先按职责把 Coordinator / Planning、Research、Evidence Review、
    Report Writer、Report Verification 拆为可审计的子 Agent，并通过结构化交接契约、定向补查与评测
    证明拆分的价值；Event/Data Agent 属于后续事件研究方向的可插拔扩展，不替代这条近期主线。

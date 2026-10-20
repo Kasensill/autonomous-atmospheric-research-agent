@@ -15,7 +15,7 @@ class FakeGraph:
 
 def test_run_research_starts_graph_with_initial_state(monkeypatch) -> None:
     fake_graph = FakeGraph({"question": "测试", "final_report": "报告"})
-    monkeypatch.setattr(run_module, "build_research_graph", lambda: fake_graph)
+    monkeypatch.setattr(run_module, "build_research_graph", lambda **kwargs: fake_graph)
 
     result = run_module.run_research("测试")
 
