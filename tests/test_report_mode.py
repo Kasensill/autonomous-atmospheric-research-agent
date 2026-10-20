@@ -33,6 +33,27 @@ def test_draft_sets_mode_without_program_notice(sufficient, next_step, mode):
     assert update["draft_report"] == "下沉运动抑制云雨。[E1]"
 
 
+@pytest.mark.parametrize("evidence", [
+    [],
+    [{"source_type": "weather", "valid_at": "2000-01-01T00:00:00+00:00",
+      "content": "过期天气快照"}],
+], ids=["empty-evidence", "all-expired-weather"])
+def test_draft_rejects_unusable_evidence_without_calling_model(evidence):
+    class UnexpectedModel:
+        calls = 0
+
+        def invoke(self, messages):
+            self.calls += 1
+            raise AssertionError("没有可用证据时不能调用生成模型")
+
+    state = create_initial_state("没有可用证据的问题")
+    state["evidence"] = evidence
+    model = UnexpectedModel()
+    with pytest.raises(ValueError, match="generate_draft 需要正式证据"):
+        nodes.generate_draft_with_model(state, model)
+    assert model.calls == 0
+
+
 @pytest.mark.parametrize("mode", ("full", "limited"))
 def test_verified_report_saves_mode_and_limited_notice_only_at_finalize(monkeypatch, tmp_path, mode):
     state = state_with_evidence()

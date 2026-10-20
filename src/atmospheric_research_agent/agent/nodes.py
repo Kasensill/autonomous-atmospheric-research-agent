@@ -1000,54 +1000,10 @@ def route_after_report_verification(
     return "finalize_limited_report"
 
 
-def generate_report_with_model(state: ResearchState, model: Any) -> dict[str, Any]:
-    """由传入模型撰写报告正文，再由程序附加来源清单。"""
-
-    if not state.get("evidence"):
-        final_report = (
-            "# 研究受限结论\n\n"
-            "本次研究未取得足以支持回答的正式证据，因此不能给出可靠结论。\n\n"
-            + _reference_section([])
-        )
-        return {
-            "final_report": final_report,
-            "trace": [
-                {
-                    "node": "generate_report",
-                    "event": "limited_report_without_evidence",
-                    "detail": "没有正式证据，生成未获证据支持的受限结论。",
-                }
-            ],
-        }
-
-    mode = _report_mode(state)
-    response = model.invoke(_report_messages(state, mode))
-    if not isinstance(response, AIMessage) or not isinstance(response.content, str):
-        raise TypeError("报告模型返回的不是文本 AIMessage。")
-
-    final_report = f"{response.content.strip()}\n\n{_reference_section(_numbered_evidence(state))}"
-    return {
-        "final_report": final_report,
-        "trace": [
-            {
-                "node": "generate_report",
-                "event": "report_generated",
-                "detail": f"已生成 {mode} 报告，并由程序附加来源清单。",
-            }
-        ],
-    }
-
-
-def generate_report_node(state: ResearchState) -> dict[str, Any]:
-    """LangGraph 节点入口：生成完整或受限结论报告。"""
-
-    return generate_report_with_model(state, _create_base_model())
-
-
 def generate_draft_with_model(state: ResearchState, model: Any) -> dict[str, Any]:
     """生成待审查的报告草稿；V2 中它不能直接成为 ``final_report``。"""
 
-    if not state.get("evidence"):
+    if not usable_evidence(state):
         raise ValueError("generate_draft 需要正式证据；零证据情形应走受限结论路径。")
     mode = _report_mode(state)
     response = model.invoke(_report_messages(state, mode))

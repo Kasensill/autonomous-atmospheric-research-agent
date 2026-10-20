@@ -10,7 +10,6 @@ from atmospheric_research_agent.agent.nodes import (
     EvidenceAssessmentOutput,
     assess_evidence_with_model,
     execute_tool_calls,
-    generate_report_with_model,
     generate_draft_with_model,
     parse_no_tool_decision,
     record_results_node,
@@ -343,32 +342,6 @@ class FakeReportModel:
         return AIMessage(content="# 结论\n\n下沉运动可抑制云雨。[E1]")
 
 
-def test_generate_report_appends_programmatic_sources() -> None:
-    state = create_initial_state("副热带高压有什么影响？")
-    state["evidence"] = [
-        {
-            "evidence_id": "evidence_1",
-            "content": "下沉运动常抑制云雨。",
-            "source_display_name": "知识库：副热带高压 > 影响",
-            "source_location": "03_环流/副热带高压.md",
-        }
-    ]
-    state["assessment"] = {
-        "sufficient": True,
-        "covered_points": ["天气影响"],
-        "missing_points": [],
-        "potential_conflicts": [],
-        "next_step": "full_report",
-        "reason": "证据充分。",
-    }
-
-    update = generate_report_with_model(state, FakeReportModel())
-
-    assert "下沉运动可抑制云雨。[E1]" in update["final_report"]
-    assert "## 资料来源" in update["final_report"]
-    assert "[E1] 知识库：副热带高压 > 影响（03_环流/副热带高压.md）" in update["final_report"]
-
-
 def test_reference_section_normalizes_markdown_titles_and_urls() -> None:
     reference_section = _reference_section(
         [
@@ -385,15 +358,6 @@ def test_reference_section_normalizes_markdown_titles_and_urls() -> None:
     assert "原始链接](" not in reference_section
     assert "[来源页](https://example.org/article)" in reference_section
     assert "来源：示例机构；时间：2026-01-01" in reference_section
-
-
-def test_generate_report_without_evidence_does_not_call_model() -> None:
-    state = create_initial_state("没有证据的问题")
-
-    update = generate_report_with_model(state, model=None)
-
-    assert "不能给出可靠结论" in update["final_report"]
-    assert "未取得可引用的正式证据" in update["final_report"]
 
 
 def test_draft_revision_and_finalization_are_separate_steps() -> None:

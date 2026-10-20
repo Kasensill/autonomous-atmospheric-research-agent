@@ -23,14 +23,17 @@ def test_weather_fields_survive_tool_to_formal_evidence():
 
 def test_final_sources_only_include_cited_ids_without_renumbering():
     state = create_initial_state("研究")
-    state.update(draft_report="结论 [E2]。", report_review={"verdict": "pass"}, evidence=[
+    state.update(draft_report="结论 [E2]。", report_mode="full", report_review={"verdict": "pass"}, evidence=[
         {"evidence_id": "1", "source_location": "unused.md"},
-        {"evidence_id": "2", "source_location": "used.md"},
+        {"evidence_id": "2", "source_display_name": "知识库：副热带高压 > 影响", "source_location": "used.md"},
     ])
     result = nodes.finalize_report_node(state)["final_report"]
     assert "unused.md" not in result
     assert "- [E2]" in result
     assert "used.md" in result
+    assert "结论 [E2]。" in result
+    assert "## 资料来源" in result
+    assert "[E2] 知识库：副热带高压 > 影响（used.md）" in result
 
 
 def test_two_cited_fragments_at_same_source_keep_both_citation_ids():
