@@ -158,12 +158,17 @@ def format_final_result(result: ResearchState, *, debug: bool = False) -> str:
         ]
         review = result.get("report_review")
         if review:
+            required_count = len(review.get("required_changes", []))
+            suggestion_count = sum(
+                item.startswith("[建议]") for item in review.get("unsupported_or_overstated_claims", [])
+            )
             debug_parts.extend(
                 [
                     "",
                     "## 报告核验",
                     "",
                     f"- 审查结论：{review.get('verdict', 'unknown')}",
+                    f"- 必须修改 {required_count} 条，建议 {suggestion_count} 条",
                     f"- 已修订次数：{result.get('report_revision_count', 0)}",
                     f"- 审查理由：{review.get('reason', '未提供')}",
                 ]
