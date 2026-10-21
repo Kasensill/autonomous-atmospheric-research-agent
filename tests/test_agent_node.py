@@ -149,6 +149,7 @@ def test_record_results_does_not_turn_tool_error_into_evidence() -> None:
     assert update["evidence"] == []
     assert update["tool_call_count"] == 1
     assert update["trace"][0]["event"] == "tool_failed"
+    assert update["trace"][0]["status"] == "error"
 
 
 def test_record_results_turns_current_weather_into_evidence() -> None:

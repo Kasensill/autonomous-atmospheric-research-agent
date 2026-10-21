@@ -639,7 +639,10 @@ def record_results_node(state: ResearchState) -> dict[str, Any]:
             {
                 "node": "record_results",
                 "event": event,
+                "status": "error" if event in {"tool_failed", "tool_result_invalid"} else "success",
                 "detail": detail,
+                **({"source_diagnostics": result_diagnostics["diagnostics"]}
+                   if message.name == "read_source" and isinstance(result_diagnostics.get("diagnostics"), dict) else {}),
                 "tool_name": message.name,
                 "returned_count": len(records),
                 "accepted_count": len(new_records),

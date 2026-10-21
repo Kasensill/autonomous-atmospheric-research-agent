@@ -133,8 +133,8 @@ class TraceEntry(TypedDict, total=False):
     detail: str
     # 事件发生的 UTC 时间，便于按一次运行的顺序复盘。
     timestamp: str
-    # 节点生命周期状态；当前自动记录 started 与 success。
-    status: Literal["started", "success"]
+    # 生命周期状态与业务事件状态；工具失败为 error，节点处理完成仍可为 success。
+    status: Literal["started", "success", "error"]
     # 节点或整次运行的耗时，单位毫秒；只有完成事件才有。
     duration_ms: float
     # 可选的工具与路由诊断；只记录允许展示的参数，不写密钥或完整工具正文。
@@ -149,6 +149,8 @@ class TraceEntry(TypedDict, total=False):
     tool_call_limit: int
     relevance_gate: dict
     top_scores: list[float | None]
+    # 网页读取诊断：PDF 判定布尔值、响应类型和字节数，不含正文。
+    source_diagnostics: dict
     # 程序根据已完成问答历史确认的额度，与模型自由生成的理由分开。
     clarification_quota: dict[str, int]
 

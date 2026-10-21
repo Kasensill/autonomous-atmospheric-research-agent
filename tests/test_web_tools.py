@@ -31,8 +31,9 @@ def test_search_public_web_returns_candidates_not_evidence(monkeypatch) -> None:
 def test_read_public_source_extracts_content_and_metadata(monkeypatch) -> None:
     class FakeTrafilatura:
         @staticmethod
-        def fetch_url(url):
-            return "<html>测试</html>"
+        def fetch_response(url, *, decode, with_headers):
+            assert decode is False and with_headers is True
+            return SimpleNamespace(data="<html>测试</html>".encode("utf-8"), status=200, headers={"content-type": "text/html"})
 
         @staticmethod
         def extract(*args, **kwargs):

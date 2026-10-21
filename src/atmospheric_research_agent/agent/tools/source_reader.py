@@ -3,13 +3,14 @@
 from ipaddress import ip_address
 import re
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from langchain_core.tools import tool
 
 from ..settings import MAX_SOURCE_CHARACTERS
 
 MARKDOWN_LINK_PATTERN = re.compile(r"^\[[^\]]*\]\((https?://[^\s)]+)\)$")
+PDF_UNSUPPORTED_MESSAGE = "该来源是 PDF，当前不支持解析，请改读其他 HTML 来源"
 
 
 def _validate_public_url(url: str) -> str:
@@ -39,25 +40,54 @@ def _validate_public_url(url: str) -> str:
 def read_public_source(url: str) -> dict[str, Any]:
     """下载并提取网页主正文、标题、作者、日期和站点名称。"""
 
+    diagnostics: dict[str, Any] = {
+        "pdf_detection": {"url_suffix": False, "content_header": False, "content_type": False},
+        "content_type": None,
+        "downloaded_bytes": 0,
+        "download_attempted": False,
+    }
+
+    def failure(message: str, source_url: str) -> dict[str, Any]:
+        return {"status": "error", "tool": "read_source", "url": source_url,
+                "message": message, "diagnostics": diagnostics}
+
     try:
         clean_url = _validate_public_url(url)
     except ValueError as error:
-        return {"status": "error", "tool": "read_source", "url": url, "message": str(error)}
+        return failure(str(error), url)
+
+    diagnostics["pdf_detection"]["url_suffix"] = unquote(urlparse(clean_url).path).lower().endswith(".pdf")
+    if diagnostics["pdf_detection"]["url_suffix"]:
+        return failure(PDF_UNSUPPORTED_MESSAGE, clean_url)
 
     try:
         import trafilatura
     except ImportError as error:  # pragma: no cover - 依赖安装问题
-        return {
-            "status": "error",
-            "tool": "read_source",
-            "url": clean_url,
-            "message": "未安装 trafilatura，请先安装项目依赖。",
-        }
+        return failure("未安装 trafilatura，请先安装项目依赖。", clean_url)
 
+    stage = "网页下载"
     try:
-        downloaded = trafilatura.fetch_url(clean_url)
+        diagnostics.update(download_attempted=True, downloaded_bytes=None)
+        response = trafilatura.fetch_response(clean_url, decode=False, with_headers=True)
+        if response is None:
+            return failure("网页下载失败或未获得响应内容。", clean_url)
+        downloaded = response.data or b""
+        diagnostics["downloaded_bytes"] = len(downloaded)
+        diagnostics["http_status"] = response.status
+        headers = response.headers or {}
+        raw_type = next((str(value) for key, value in headers.items() if key.lower() == "content-type"), "")
+        content_type = raw_type.split(";", 1)[0].strip().lower()
+        # 只记录 MIME 类型；不保存响应头其他字段、内容头原文或正文。
+        diagnostics["content_type"] = content_type if re.fullmatch(r"[a-z0-9.+-]+/[a-z0-9.+-]+", content_type) else None
+        diagnostics["pdf_detection"]["content_type"] = content_type == "application/pdf"
+        diagnostics["pdf_detection"]["content_header"] = downloaded.startswith(b"%PDF")
+        if any(diagnostics["pdf_detection"].values()):
+            return failure(PDF_UNSUPPORTED_MESSAGE, clean_url)
+        if response.status != 200:
+            return failure(f"网页下载失败：HTTP {response.status}。", clean_url)
         if not downloaded:
-            raise ValueError("网页下载失败或未获得 HTML 内容。")
+            return failure("网页下载失败或未获得响应内容。", clean_url)
+        stage = "网页正文提取"
         content = trafilatura.extract(
             downloaded,
             url=clean_url,
@@ -65,22 +95,18 @@ def read_public_source(url: str) -> dict[str, Any]:
             include_tables=True,
         )
         if not content:
-            raise ValueError("未能从网页提取可读正文。")
+            return failure("网页正文读取失败：未能从网页提取可读正文。", clean_url)
         metadata = trafilatura.extract_metadata(downloaded, default_url=clean_url)
-    except (OSError, ValueError) as error:
-        return {
-            "status": "error",
-            "tool": "read_source",
-            "url": clean_url,
-            "message": f"网页正文读取失败：{error}",
-        }
+    except Exception as error:
+        # 第三方异常文本可能包含正文，只暴露阶段和异常类型。
+        return failure(f"{stage}失败（{type(error).__name__}）。", clean_url)
 
     was_truncated = len(content) > MAX_SOURCE_CHARACTERS
     extracted_content = content[:MAX_SOURCE_CHARACTERS]
-    title = metadata.title or clean_url
-    author = metadata.author or None
-    organization = metadata.sitename or metadata.hostname or None
-    published_at = metadata.date or None
+    title = getattr(metadata, "title", None) or clean_url
+    author = getattr(metadata, "author", None) or None
+    organization = getattr(metadata, "sitename", None) or getattr(metadata, "hostname", None) or None
+    published_at = getattr(metadata, "date", None) or None
     return {
         "status": "success",
         "tool": "read_source",

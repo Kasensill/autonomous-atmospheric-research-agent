@@ -137,7 +137,7 @@ def format_final_result(result: ResearchState, *, debug: bool = False) -> str:
         for item in trace:
             duration = item.get("duration_ms")
             duration_text = f" / {duration} ms" if duration is not None else ""
-            diagnostics = {key: item[key] for key in ("tool_calls", "tool_name", "returned_count", "accepted_count", "duplicate_count", "relevance_gate", "top_scores", "clarification_quota") if key in item}
+            diagnostics = {key: item[key] for key in ("tool_calls", "tool_name", "returned_count", "accepted_count", "duplicate_count", "relevance_gate", "top_scores", "clarification_quota", "source_diagnostics") if key in item}
             diagnostics_text = f" {json.dumps(diagnostics, ensure_ascii=False)}" if diagnostics else ""
             trace_lines.append(
                 f"- [{item.get('timestamp', 'unknown')}] "
