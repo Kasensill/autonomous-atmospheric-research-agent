@@ -216,7 +216,7 @@ def test_limit_without_evidence_fails_without_spending_rounds(monkeypatch, round
 
 class ClarifyingAssessment:
     def invoke(self, messages):
-        assert "不可再追问" in messages[1].content
+        assert "当前不可再追问用户。" in messages[0].content
         return nodes.EvidenceAssessmentOutput(
             sufficient=False, covered_points=[], missing_points=["年份"], potential_conflicts=[],
             next_step="clarify", reason="缺年份", clarification_question="哪一年？",

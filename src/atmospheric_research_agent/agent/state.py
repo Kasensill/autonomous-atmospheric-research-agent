@@ -149,6 +149,8 @@ class TraceEntry(TypedDict, total=False):
     tool_call_limit: int
     relevance_gate: dict
     top_scores: list[float | None]
+    # 程序根据已完成问答历史确认的额度，与模型自由生成的理由分开。
+    clarification_quota: dict[str, int]
 
 
 class ResearchState(TypedDict, total=False):
