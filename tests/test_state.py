@@ -7,6 +7,7 @@ from atmospheric_research_agent.agent.nodes import (
     verify_report_with_model,
 )
 from atmospheric_research_agent.agent.state import create_initial_state
+from atmospheric_research_agent.agent.settings import MAX_REPORT_REVISION_ROUNDS
 
 
 def test_create_initial_state_sets_explicit_defaults() -> None:
@@ -104,8 +105,11 @@ def test_citation_integrity_accepts_existing_evidence_number() -> None:
     ("review", "revision_count", "expected_route"),
     [
         ({"verdict": "pass"}, 0, "finalize_report"),
+        ({"verdict": "pass"}, MAX_REPORT_REVISION_ROUNDS, "finalize_report"),
         ({"verdict": "revise"}, 0, "revise_report"),
-        ({"verdict": "revise"}, 1, "finalize_limited_report"),
+        ({"verdict": "revise"}, MAX_REPORT_REVISION_ROUNDS - 1, "revise_report"),
+        ({"verdict": "revise"}, MAX_REPORT_REVISION_ROUNDS, "finalize_limited_report"),
+        ({"verdict": "revise"}, MAX_REPORT_REVISION_ROUNDS + 1, "finalize_limited_report"),
     ],
 )
 def test_route_after_report_verification_has_a_bounded_loop(

@@ -248,7 +248,7 @@ def build_research_graph(*, checkpointer: Any = None) -> Any:
         },
     )
 
-    # 草稿必须先审查；修订后回到审查，最多一次；仍未通过则安全降级。
+    # 草稿必须先审查；修订后回到审查，次数由 settings.MAX_REPORT_REVISION_ROUNDS 限制。
     builder.add_edge("generate_draft", "verify_report")
     builder.add_conditional_edges(
         "verify_report",

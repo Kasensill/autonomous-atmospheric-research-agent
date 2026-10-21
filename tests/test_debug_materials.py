@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage
 from atmospheric_research_agent.agent import nodes
 import atmospheric_research_agent.agent.graph as graph_module
 import atmospheric_research_agent.agent.run as run_module
+from atmospheric_research_agent.agent.settings import MAX_REPORT_REVISION_ROUNDS
 
 
 def setup_offline_run(monkeypatch, tmp_path, *, final_verdict="pass", clarify=False):
@@ -74,10 +75,14 @@ def test_debug_preserves_all_drafts_reviews_evidence_and_final_output(monkeypatc
     assert questions == ["哪个地区？"]
     assert (directory / "draft_01.md").read_text(encoding="utf-8") == "原草稿全文，待修改。[E2]"
     assert (directory / "draft_02.md").read_text(encoding="utf-8") == "修订草稿全文。[E2]"
-    assert len(list(directory.glob("draft_*.md"))) == 2
-    assert len(list(directory.glob("review_*.json"))) == 2
+    expected_versions = 1 + MAX_REPORT_REVISION_ROUNDS if final_verdict == "revise" else 2
+    assert len(list(directory.glob("draft_*.md"))) == expected_versions
+    assert len(list(directory.glob("review_*.json"))) == expected_versions
     assert json.loads((directory / "review_01.json").read_text(encoding="utf-8")) == reviews[0]
     assert json.loads((directory / "review_02.json").read_text(encoding="utf-8")) == reviews[1]
+    for version in range(2, expected_versions + 1):
+        assert (directory / f"draft_{version:02d}.md").read_text(encoding="utf-8") == "修订草稿全文。[E2]"
+        assert json.loads((directory / f"review_{version:02d}.json").read_text(encoding="utf-8")) == reviews[version - 1]
     saved_evidence = json.loads((directory / "evidence.json").read_text(encoding="utf-8"))
     for index, (saved, record) in enumerate(zip(saved_evidence, records), start=1):
         assert saved["citation_id"] == f"E{index}"

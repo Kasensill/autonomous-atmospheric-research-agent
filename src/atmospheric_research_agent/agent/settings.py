@@ -12,8 +12,8 @@ from typing import Any
 MAX_RESEARCH_ROUNDS = 3
 MAX_TOOL_CALLS = 8
 GRAPH_RECURSION_LIMIT = 30
-# 报告最多接受一次受控修订；避免 Reflection 让图在写作与自检间无限循环。
-MAX_REPORT_REVISION_ROUNDS = 1
+# 报告受控修订预算；避免 Reflection 让图在写作与自检间无限循环。
+MAX_REPORT_REVISION_ROUNDS = 2
 MAX_CLARIFICATIONS = 2
 
 
