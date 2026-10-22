@@ -1,4 +1,4 @@
-"""PDF 拒绝、网页失败诊断及 Trace 状态的纯离线回归。"""
+"""PDF 分流、网页失败诊断及 Trace 状态的纯离线回归。"""
 
 import json
 import sys
@@ -31,6 +31,13 @@ def fake_reader(monkeypatch, *, data=b"<html>private body</html>", headers=None,
             raise extract_error
         return content
 
+    def parse_pdf(data, url, diagnostics):
+        calls.append("pdf")
+        return {"status": "error", "tool": "read_source", "url": url,
+                "message": "PDF 离线解析失败", "diagnostics": diagnostics}
+
+    monkeypatch.setattr(source_reader, "_read_pdf_source", parse_pdf)
+
     monkeypatch.setitem(sys.modules, "trafilatura", SimpleNamespace(
         fetch_response=download, extract=extract,
         extract_metadata=lambda *args, **kwargs: SimpleNamespace(
@@ -43,17 +50,17 @@ def fake_reader(monkeypatch, *, data=b"<html>private body</html>", headers=None,
     "https://example.org/report.pdf", "https://example.org/report.PDF?download=1",
     "[PDF](https://example.org/report.pdf#page=2)",
 ])
-def test_pdf_suffix_is_rejected_without_download(monkeypatch, url):
+def test_pdf_suffix_is_downloaded_then_sent_to_parser(monkeypatch, url):
     calls = fake_reader(monkeypatch)
     result = source_reader.read_public_source(url)
-    assert result["message"] == source_reader.PDF_UNSUPPORTED_MESSAGE
+    assert result["message"] == "PDF 离线解析失败"
     assert result["status"] == "error"
     assert result["diagnostics"]["pdf_detection"] == {
         "url_suffix": True, "content_header": False, "content_type": False,
     }
-    assert result["diagnostics"]["downloaded_bytes"] == 0
-    assert not result["diagnostics"]["download_attempted"]
-    assert calls == []
+    assert result["diagnostics"]["downloaded_bytes"] == len(b"<html>private body</html>")
+    assert result["diagnostics"]["download_attempted"]
+    assert calls == ["download", "pdf"]
 
 
 @pytest.mark.parametrize("data,headers,header_hit,type_hit", [
@@ -61,15 +68,15 @@ def test_pdf_suffix_is_rejected_without_download(monkeypatch, url):
     (b"private body", {"Content-Type": "Application/PDF; charset=binary"}, False, True),
     (b"%PDF-1.7\nprivate body", {"content-type": "application/pdf"}, True, True),
 ])
-def test_pdf_magic_or_response_type_is_rejected_before_extraction(monkeypatch, data, headers, header_hit, type_hit):
+def test_pdf_magic_or_response_type_reaches_pdf_not_html_parser(monkeypatch, data, headers, header_hit, type_hit):
     calls = fake_reader(monkeypatch, data=data, headers=headers)
     result = source_reader.read_public_source("https://example.org/download?id=123")
-    assert result["message"] == source_reader.PDF_UNSUPPORTED_MESSAGE
+    assert result["message"] == "PDF 离线解析失败"
     assert result["diagnostics"]["pdf_detection"] == {
         "url_suffix": False, "content_header": header_hit, "content_type": type_hit,
     }
     assert result["diagnostics"]["downloaded_bytes"] == len(data)
-    assert calls == ["download"]
+    assert calls == ["download", "pdf"]
     assert "private body" not in json.dumps(result)
     assert "%PDF" not in json.dumps(result)
 
