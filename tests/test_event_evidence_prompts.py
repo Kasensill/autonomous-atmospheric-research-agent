@@ -97,3 +97,47 @@ def test_writing_and_revision_preserve_source_nature_and_disclose_conflicts(stag
     else:
         assert "Open-Meteo 模型当前条件只能称为“模型当前条件”，不能称“实况”“观测事实”或“站点实测”。" in prompt
         assert "没有同期气候基准或明确比较对象时，不写“偏冷”“偏暖”等比较结论。" in prompt
+
+
+@pytest.mark.parametrize("stage", ["full", "limited", "revision", "verification"])
+def test_user_statements_are_not_evidence_in_report_prompts(stage):
+    state = prompt_state()
+    if stage == "revision":
+        messages = nodes._revision_messages(state)
+    elif stage == "verification":
+        messages = nodes._verification_messages(state)
+    else:
+        messages = nodes._report_messages(state, stage)
+    prompt = messages[0].content
+    for phrase in (
+        "用户补充记录是“用户陈述”，不是证据",
+        "可作为问题的已知条件，但不得标注 E 编号",
+        "不得写成已核实的事实",
+        "不得与证据并列称为“证据间分歧”",
+        "与证据不一致时写“用户陈述与证据不一致，无法核实”，并列入局限性",
+    ):
+        assert phrase in prompt
+    if stage == "verification":
+        assert "把用户陈述与证据的差异归为“建议”" in prompt
+        assert "以“[建议]”开头写入 unsupported_or_overstated_claims，不要作为必须修改项" in prompt
+
+
+def test_agent_prioritizes_reading_event_facts_over_general_mechanisms():
+    prompt = nodes.AGENT_SYSTEM_PROMPT
+    for phrase in (
+        "search_web 只产生候选来源，不产生证据，取得网页证据至少需要搜索和读取两个步骤",
+        "事件事实（尤其实况）尚未取得时，不要把剩余研究轮次用于一般机制检索",
+        "先读取其他候选来源或换检索词寻找实况",
+        "确认确实找不到实况后，才转向本地知识库解释机制",
+        "读取候选时优先官方气象机构发布、实况通报、同行评审论文",
+        "只有导航或栏目内容的页面应视为无效，换一个来源",
+    ):
+        assert phrase in prompt
+    assert prompt.index("search_web 只产生候选来源") > prompt.index("只找到邻近地区的资料")
+
+
+def test_assessment_reason_does_not_explain_program_budgets():
+    prompt = nodes._assessment_messages(prompt_state())[0].content
+    assert "reason 里不得描述预算余量或剩余额度" in prompt
+    assert "研究轮次、工具调用、澄清次数均由程序记录，以程序给出的数字为准" in prompt
+    assert "需要继续检索时，只在 missing_points 里写明还缺什么" in prompt
