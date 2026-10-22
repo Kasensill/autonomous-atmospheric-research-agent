@@ -395,8 +395,8 @@ def route_after_agent(
     if research_calls:
         requested_count = len(research_calls)
         # research_round 以已执行的一批工具为单位计数。达到上限后不允许模型再
-        # 发起下一批工具；先经过守卫确认已有正式证据，避免“预算为 3 却执行第
-        # 4 轮”，也避免零证据时直接写报告。
+        # 发起下一批工具；先经过守卫确认已有正式证据，避免超过集中配置的
+        # 研究轮次上限，也避免零证据时直接写报告。
         if not tool_batch_fits_budget(state, requested_count):
             return "research_guard"
         return "tools"

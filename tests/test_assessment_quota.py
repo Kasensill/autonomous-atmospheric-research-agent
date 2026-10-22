@@ -2,7 +2,7 @@ import pytest
 
 from atmospheric_research_agent.agent import nodes
 from atmospheric_research_agent.agent.run import format_final_result
-from atmospheric_research_agent.agent.settings import MAX_CLARIFICATIONS
+from atmospheric_research_agent.agent.settings import MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
 from atmospheric_research_agent.agent.state import create_initial_state
 
 
@@ -11,7 +11,7 @@ def state_with_history(used):
     state.update(
         evidence=[{"source_type": "local_knowledge", "content": "一般机制"}],
         clarification_history=[{"question": str(i), "answer": "补充"} for i in range(used)],
-        research_round=3, tool_call_count=8,
+        research_round=MAX_RESEARCH_ROUNDS, tool_call_count=MAX_TOOL_CALLS,
     )
     return state
 
@@ -28,8 +28,8 @@ def test_quota_sentence_is_explicit_and_separate_from_research_budgets(used, sen
     assert messages[0].content.endswith("\n\n" + sentence)
     assert "当前研究轮次" not in messages[0].content
     assert "当前工具调用数" not in messages[0].content
-    assert "当前研究轮次：3/3" in messages[1].content
-    assert "当前工具调用数：8/8" in messages[1].content
+    assert f"当前研究轮次：{MAX_RESEARCH_ROUNDS}/{MAX_RESEARCH_ROUNDS}" in messages[1].content
+    assert f"当前工具调用数：{MAX_TOOL_CALLS}/{MAX_TOOL_CALLS}" in messages[1].content
     assert "已完成澄清" not in "\n".join(m.content for m in messages)
 
 

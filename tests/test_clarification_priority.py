@@ -79,7 +79,7 @@ def test_ask_user_is_bound_but_not_registered_for_execution(monkeypatch):
 
 def test_multiple_asks_cancel_research_and_have_closed_protocol_before_pause(monkeypatch):
     state = create_initial_state("天气")
-    state.update(research_round=3, tool_call_count=8)
+    state.update(research_round=MAX_RESEARCH_ROUNDS, tool_call_count=8)
     model = SequenceModel([AIMessage(content="", tool_calls=[ask(), search(), ask("ask2", "哪一年？")])])
     monkeypatch.setattr(nodes, "create_research_model", lambda: model)
     update = nodes.agent_node(state)
@@ -179,7 +179,7 @@ def test_tools_safely_refuses_control_call_even_if_registry_contains_it(monkeypa
 @pytest.mark.parametrize("batch,expected", [(1, "tools"), (2, "research_guard")])
 def test_limit_rejects_only_ask_and_uses_normal_batch_budget(monkeypatch, batch, expected):
     state = create_initial_state("研究")
-    state.update(clarification_history=history(), research_round=2, tool_call_count=7)
+    state.update(clarification_history=history(), research_round=MAX_RESEARCH_ROUNDS - 1, tool_call_count=7)
     response = AIMessage(content="", tool_calls=[ask(), *[search(str(i)) for i in range(batch)]])
     monkeypatch.setattr(nodes, "create_research_model", lambda: SequenceModel([response]))
     update = graph_module._instrument_node("agent", nodes.agent_node)(state)
@@ -197,7 +197,7 @@ def test_limit_rejects_only_ask_and_uses_normal_batch_budget(monkeypatch, batch,
     assert state["tool_call_count"] == 7
 
 
-@pytest.mark.parametrize("rounds,count", [(0, 0), (3, 8)])
+@pytest.mark.parametrize("rounds,count", [(0, 0), (MAX_RESEARCH_ROUNDS, 8)])
 def test_limit_without_evidence_fails_without_spending_rounds(monkeypatch, rounds, count):
     state = create_initial_state("研究")
     state.update(clarification_history=history(), research_round=rounds, tool_call_count=count)
@@ -273,16 +273,16 @@ def test_real_pause_resume_cancels_mixed_tools_and_next_model_input_is_valid(mon
     # 重新构图以绑定 tools 陷阱。
     graph = graph_module.build_research_graph(checkpointer=InMemorySaver())
     state = create_initial_state("研究")
-    state.update(evidence=evidence(), research_round=3, tool_call_count=8)
+    state.update(evidence=evidence(), research_round=MAX_RESEARCH_ROUNDS, tool_call_count=8)
     config = {"configurable": {"thread_id": state["run_id"]}}
     paused = graph.invoke(state, config)
     assert paused["__interrupt__"]
     assert_protocol_closed(paused["messages"])
-    assert paused["tool_call_count"] == 8 and paused["research_round"] == 3
+    assert paused["tool_call_count"] == 8 and paused["research_round"] == MAX_RESEARCH_ROUNDS
     resumed = graph.invoke(Command(resume="北京"), config)
     assert_protocol_closed(resumed["messages"])
     assert len(resumed["clarification_history"]) == 1
-    assert resumed["tool_call_count"] == 8 and resumed["research_round"] == 3
+    assert resumed["tool_call_count"] == 8 and resumed["research_round"] == MAX_RESEARCH_ROUNDS
     assert model.calls == 2 and resumed["final_report"]
 
 
@@ -354,7 +354,7 @@ def test_agent_and_assessment_share_two_pauses_in_same_real_graph(monkeypatch):
 
 def test_control_responses_do_not_consume_an_extra_tool_slot_after_limit(monkeypatch):
     state = create_initial_state("研究")
-    state.update(clarification_history=history(), research_round=2, tool_call_count=7)
+    state.update(clarification_history=history(), research_round=MAX_RESEARCH_ROUNDS - 1, tool_call_count=7)
     model = SequenceModel([AIMessage(content="", tool_calls=[ask(), search()])])
     @tool
     def search_local_knowledge(query: str) -> dict:
@@ -366,5 +366,5 @@ def test_control_responses_do_not_consume_an_extra_tool_slot_after_limit(monkeyp
     apply_update(state, nodes.agent_node(state))
     apply_update(state, nodes.tools_node(state))
     apply_update(state, nodes.record_results_node(state))
-    assert state["tool_call_count"] == 8 and state["research_round"] == 3
+    assert state["tool_call_count"] == 8 and state["research_round"] == MAX_RESEARCH_ROUNDS
     assert_protocol_closed(state["messages"])

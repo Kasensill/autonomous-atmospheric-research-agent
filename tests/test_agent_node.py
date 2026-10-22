@@ -274,17 +274,17 @@ def test_research_guard_retries_empty_research_within_budget() -> None:
 
 def test_research_guard_routes_to_limited_report_when_budget_is_exhausted() -> None:
     state = create_initial_state("测试")
-    state["research_round"] = 2
+    state["research_round"] = nodes_module.MAX_RESEARCH_ROUNDS - 1
 
     state.update(research_guard_node(state))
 
-    assert state["research_round"] == 3
+    assert state["research_round"] == nodes_module.MAX_RESEARCH_ROUNDS
     assert route_after_research_guard(state) == "finalize_limited_report"
 
 
 def test_finalize_limited_report_explains_zero_evidence_budget_exhaustion() -> None:
     state = create_initial_state("测试")
-    state["research_round"] = 3
+    state["research_round"] = nodes_module.MAX_RESEARCH_ROUNDS
 
     update = finalize_limited_report_node(state)
 

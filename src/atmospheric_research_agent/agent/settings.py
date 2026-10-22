@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 # 图与研究循环预算：防止模型反复调用工具或让图无限循环。
-MAX_RESEARCH_ROUNDS = 3
+MAX_RESEARCH_ROUNDS = 4
 MAX_TOOL_CALLS = 8
 GRAPH_RECURSION_LIMIT = 30
 # 报告受控修订预算；避免 Reflection 让图在写作与自检间无限循环。
