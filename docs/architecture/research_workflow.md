@@ -2,62 +2,82 @@
 
 本图以 `graph.py` 实际注册的节点、固定边和条件边为准。先通过 `build_research_graph().get_graph().draw_mermaid()` 离线生成骨架，再补充中文标签和路由条件；构图没有执行 `invoke`，不调用模型或外部 API。
 
-## 完整流程
+## 分段流程
+
+### 图 1：研究与追问
 
 ```mermaid
 flowchart TD
     __start__(["开始（__start__）"])
-    recall_memory["召回背景记忆（recall_memory）"]
-    agent["研究决策与追问协议处理（agent）<br/>ask_user 仅表达追问，不进入工具执行"]
-    tools["工具执行（tools）<br/>本地检索 / 当前天气 / 网页搜索 / HTML 或文字层 PDF 读取"]
-    record_results["整理证据与更新研究计数（record_results）"]
-    research_guard{"可用证据与额度守卫（research_guard）"}
-    assess_evidence{"证据评估与下一步判断（assess_evidence）"}
-    request_clarification["人工追问与暂停恢复（request_clarification）<br/>interrupt 等待；Command 恢复"]
-    generate_draft["生成完整或受限草稿（generate_draft）<br/>report_mode = full / limited"]
-    verify_report{"模型与程序核验（verify_report）"}
-    revise_report["按审查意见修订草稿（revise_report）"]
-    finalize_report["定稿并附引用来源（finalize_report）<br/>limited 额外附加受限提示"]
-    store_memory["按规则保存或跳过记忆（store_memory）<br/>仅 full、核验通过且非时效性任务写入"]
-    finalize_limited_report["生成失败说明（finalize_limited_report）<br/>不是已核验的受限报告；不存记忆"]
-    __end__(["结束（__end__）"])
+    recall_memory["召回背景（recall_memory）"]
+    agent["研究决策（agent）<br/>先处理 ask_user"]
+    tools["工具执行（tools）"]
+    record_results["整理证据与计数<br/>（record_results）"]
+    research_guard{"证据守卫<br/>（research_guard）"}
+    assess_evidence{"证据评估<br/>（assess_evidence）"}
+    request_clarification["追问、暂停与恢复<br/>（request_clarification）"]
+    generate_draft["进入图 2：草稿入口<br/>（generate_draft）"]
+    finalize_limited_report["进入图 2：失败说明入口<br/>（finalize_limited_report）"]
 
     __start__ --> recall_memory
     recall_memory --> agent
-    agent -->|"request_clarification：有效 ask_user 且澄清未满<br/>同批普通工具取消，不计数"| request_clarification
-    agent -->|"tools：没有有效待追问；普通请求整批预算允许<br/>ask_user 超限或无效不取消普通工具"| tools
-    agent -->|"research_guard：没有待追问且无普通请求<br/>或普通请求整批预算不足"| research_guard
+    agent -->|"有效追问，额度未满"| request_clarification
+    agent -->|"无待追问；普通请求整批可执行"| tools
+    agent -->|"无普通请求或批次预算不足"| research_guard
     tools --> record_results
     record_results --> agent
-    request_clarification -->|"回答写回原任务；预算保留"| agent
-    research_guard -->|"assess_evidence：有可用证据，优先于额度检查"| assess_evidence
-    research_guard -->|"finalize_limited_report：无可用证据<br/>先判澄清已满，再判研究预算耗尽"| finalize_limited_report
-    research_guard -->|"agent：无可用证据；澄清未满且预算尚余"| agent
-    assess_evidence -->|"request_clarification：clarify 且澄清未满"| request_clarification
-    assess_evidence -->|"generate_draft：full_report / limited_report<br/>或 continue 且预算耗尽；超限 clarify 改 limited_report"| generate_draft
-    assess_evidence -->|"agent：continue 且研究预算尚余"| agent
-    generate_draft --> verify_report
-    verify_report -->|"finalize_report：pass"| finalize_report
-    verify_report -->|"revise_report：revise 且修订次数未满"| revise_report
-    verify_report -->|"finalize_limited_report：revise 且修订次数已满"| finalize_limited_report
-    revise_report --> verify_report
-    finalize_report --> store_memory
-    store_memory -->|"正常结束：report_mode 为 full"| __end__
-    store_memory -->|"受限报告结束：report_mode 为 limited"| __end__
-    finalize_limited_report -->|"失败说明结束"| __end__
+    request_clarification -->|"用户回答，预算保留"| agent
+    research_guard -->|"有可用证据"| assess_evidence
+    research_guard -->|"无证据；澄清已满或预算耗尽"| finalize_limited_report
+    research_guard -->|"无证据；两类额度均未满"| agent
+    assess_evidence -->|"clarify，额度未满"| request_clarification
+    assess_evidence -->|"full_report / limited_report<br/>或 continue 预算耗尽<br/>或 clarify 额度已满"| generate_draft
+    assess_evidence -->|"continue，预算尚余"| agent
 
     classDef interaction fill:#ede9fe,stroke:#7c3aed,color:#111827
-    classDef sharedDelivery fill:#e0f2fe,stroke:#0284c7,color:#111827
+    classDef handoff fill:#e0f2fe,stroke:#0284c7,stroke-dasharray:5 3,color:#111827
     classDef failure fill:#fee2e2,stroke:#dc2626,color:#111827
     class request_clarification interaction
-    class finalize_report,store_memory sharedDelivery
+    class generate_draft handoff
     class finalize_limited_report failure
-    linkStyle 20 stroke:#15803d,stroke-width:3px,color:#15803d
-    linkStyle 21 stroke:#b45309,stroke-width:3px,stroke-dasharray:6 3,color:#b45309
-    linkStyle 22 stroke:#dc2626,stroke-width:3px,color:#dc2626
 ```
 
-绿色实线表示完整报告正常结束，橙色虚线表示受限报告结束，红色实线表示失败说明结束。完整、受限报告共用 `finalize_report → store_memory → END`；图中把最后一条固定边按结果画成两条彩色展示线，**不是新增条件边或路由函数**。实际只有一个 `__end__`。`__start__`、`__end__` 是 LangGraph 骨架中的内置节点 ID，其余 13 个 ID 均为主图注册名称。
+图 1 的两个出口沿用真实节点 ID：`generate_draft` 对应图 2 的草稿入口，`finalize_limited_report` 对应图 2 的失败说明入口，不是新增节点。`tools` 合并执行四个研究工具：本地检索、当前天气、网页搜索、HTML／文字层 PDF 读取；`ask_user` 不在其中。有效追问优先；超限或参数无效的追问不取消同批普通工具，普通工具仍检查预算。
+
+### 图 2：报告核验与结束
+
+```mermaid
+flowchart TD
+    generate_draft["生成 full / limited 草稿<br/>（generate_draft）"]
+    verify_report{"模型与程序核验<br/>（verify_report）"}
+    revise_report["修订必须修改项<br/>（revise_report）"]
+    finalize_report["定稿并附来源（finalize_report）<br/>limited 加受限提示"]
+    finalize_limited_report["失败说明（finalize_limited_report）<br/>不交付未核验草稿；不存记忆"]
+    store_memory["保存或跳过记忆（store_memory）<br/>仅 full、核验通过且非时效性任务写入<br/>limited 不写入"]
+    __end__(["结束（__end__）"])
+
+    generate_draft --> verify_report
+    verify_report -->|"pass"| finalize_report
+    verify_report -->|"revise，次数未满"| revise_report
+    verify_report -->|"revise，次数已满"| finalize_limited_report
+    revise_report --> verify_report
+    finalize_report --> store_memory
+    store_memory -->|"full：正常结束"| __end__
+    store_memory -->|"limited：受限报告结束"| __end__
+    finalize_limited_report -->|"失败说明结束"| __end__
+
+    classDef delivery fill:#e0f2fe,stroke:#0284c7,color:#111827
+    classDef failure fill:#fee2e2,stroke:#dc2626,color:#111827
+    class finalize_report,store_memory delivery
+    class finalize_limited_report failure
+    linkStyle 6 stroke:#15803d,stroke-width:3px,color:#15803d
+    linkStyle 7 stroke:#b45309,stroke-width:3px,stroke-dasharray:6 3,color:#b45309
+    linkStyle 8 stroke:#dc2626,stroke-width:3px,color:#dc2626
+```
+
+绿色实线为 full 正常结束，橙色虚线为 limited 受限报告结束，红色实线为失败说明结束。full 与 limited 共用 `finalize_report → store_memory → END`；双色结束线仅展示结果区别，不是新增路由。limited 经过记忆节点但跳过写入，失败说明不经过记忆节点。
+
+两张图合计覆盖全部 13 个业务节点，衔接节点在两图重复展示。实际只有一个 `__end__`。`__start__`、`__end__` 是 LangGraph 内置节点 ID。图 1 中守卫先检查可用证据，无证据时才检查澄清及研究预算；Agent 侧追问超限只拒绝控制请求，评估侧超限 clarify 则降级为 limited 草稿。
 
 ## 分支含义与先后顺序
 
@@ -72,7 +92,7 @@ flowchart TD
 | `route_after_report_verification` | 使用程序规范化后的 verdict：`pass` 定稿；`revise` 且修订次数未达 `MAX_REPORT_REVISION_ROUNDS` 则修订并再核验；达到上限仍有必须修改项则进入失败说明，不交付未经核验的草稿。引用完整性和简要正文长度问题仍是程序硬检查。 |
 | 两类交付 | `finalize_report` 交付核验通过的完整或受限报告；只有明确为 `full`、核验通过且非时效性的任务才写入长期记忆。`limited` 跳过存储，当前天气任务或原始证据包含天气结果时也跳过。`finalize_limited_report` 生成核验失败、无可用证据或异常状态的失败说明，直接结束，不经过记忆；澄清上限原因不写成预算耗尽。 |
 
-图上条件边标签的冒号前是路由函数真实返回值，冒号后是判断依据；`pass / revise`、`clarify / continue / full_report / limited_report` 是相应结构化判断字段，不是独立业务节点。未捕获异常和图递归上限异常不属于注册的结束分支，本图不将它们画成正常交付。
+图上条件边只标判断依据，目标节点 ID 对应路由函数的真实返回值；`pass / revise`、`clarify / continue / full_report / limited_report` 是结构化判断字段，不是独立业务节点。固定边上的说明不表示新增条件路由。未捕获异常和图递归上限异常不属于注册的结束分支，本图不将它们画成正常交付。
 
 ## 核验分级、复查与交付
 
@@ -149,7 +169,7 @@ PDF 来源标题优先采用有效元数据标题；为空或像文件名／网�
 
 ## 生成版本与复现
 
-依据代码提交：`33d7cab`（核对日期：2026-10-23）。本次仅更新两份架构说明，不修改业务实现。
+依据代码提交：`33d7cab`（核对日期：2026-10-23）。本图拆为研究与追问、报告核验与结束两段，README 同步使用这两张图，不修改业务实现。
 
 在项目根目录执行以下命令可重新生成原始 Mermaid 骨架，只打印文本，不执行研究、不联网：
 
@@ -157,4 +177,4 @@ PDF 来源标题优先采用有效元数据标题；为空或像文件名／网�
 .venv\Scripts\python -c "from atmospheric_research_agent.agent.graph import build_research_graph; print(build_research_graph().get_graph().draw_mermaid())"
 ```
 
-原始骨架不会包含本页人工补充的中文、条件说明和三类交付配色。更新图时需重新核对四个路由函数及节点内澄清预处理；本页整理图保留实际注册节点和边；README 未在本次任务中修改。本机未找到 `mmdc`，未做渲染验证；已人工检查引号、节点 ID、边标签及样式索引，并离线核对节点和边与生成骨架一致（末尾固定结束边的双色展示去重后核对）。
+原始骨架不会包含本页人工补充的中文、条件说明和三类交付配色。更新图时需重新核对四个路由函数及节点内澄清预处理；本页两图合并、去除重复衔接节点和双色结束展示边后，节点及边与生成骨架一致。README 使用相同两图。本机未找到 `mmdc`，未做渲染验证；已人工检查引号、节点 ID、边标签及样式索引，并离线核对节点和边。

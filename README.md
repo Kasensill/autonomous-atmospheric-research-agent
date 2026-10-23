@@ -13,58 +13,78 @@
 V1 已具备真实的本地知识库、外部工具调用与证据驱动报告能力。它仍是学习项目，
 不应被视为科学结论生产系统或天气预警系统。
 
+### 图 1：研究与追问
+
 ```mermaid
 flowchart TD
     __start__(["开始（__start__）"])
-    recall_memory["召回背景记忆（recall_memory）"]
-    agent["研究决策与追问协议处理（agent）<br/>ask_user 仅表达追问，不进入工具执行"]
-    tools["工具执行（tools）<br/>本地检索 / 当前天气 / 网页搜索 / 网页读取"]
-    record_results["整理证据与更新研究计数（record_results）"]
-    research_guard{"可用证据与额度守卫（research_guard）"}
-    assess_evidence{"证据评估与下一步判断（assess_evidence）"}
-    request_clarification["人工追问与暂停恢复（request_clarification）<br/>interrupt 等待；Command 恢复"]
-    generate_draft["生成完整或受限草稿（generate_draft）<br/>report_mode = full / limited"]
-    verify_report{"模型与程序核验（verify_report）"}
-    revise_report["按审查意见修订草稿（revise_report）"]
-    finalize_report["定稿并附引用来源（finalize_report）<br/>limited 额外附加受限提示"]
-    store_memory["按规则保存或跳过记忆（store_memory）<br/>时效性天气任务不存长期记忆"]
-    finalize_limited_report["生成失败说明（finalize_limited_report）<br/>不是已核验的受限报告；不存记忆"]
-    __end__(["结束（__end__）"])
+    recall_memory["召回背景（recall_memory）"]
+    agent["研究决策（agent）<br/>先处理 ask_user"]
+    tools["工具执行（tools）"]
+    record_results["整理证据与计数<br/>（record_results）"]
+    research_guard{"证据守卫<br/>（research_guard）"}
+    assess_evidence{"证据评估<br/>（assess_evidence）"}
+    request_clarification["追问、暂停与恢复<br/>（request_clarification）"]
+    generate_draft["进入图 2：草稿入口<br/>（generate_draft）"]
+    finalize_limited_report["进入图 2：失败说明入口<br/>（finalize_limited_report）"]
 
     __start__ --> recall_memory
     recall_memory --> agent
-    agent -->|"request_clarification：有效 ask_user 且澄清未满<br/>同批普通工具取消，不计数"| request_clarification
-    agent -->|"tools：没有有效待追问；普通请求整批预算允许<br/>ask_user 超限或无效不取消普通工具"| tools
-    agent -->|"research_guard：没有待追问且无普通请求<br/>或普通请求整批预算不足"| research_guard
+    agent -->|"有效追问，额度未满"| request_clarification
+    agent -->|"无待追问；普通请求整批可执行"| tools
+    agent -->|"无普通请求或批次预算不足"| research_guard
     tools --> record_results
     record_results --> agent
-    request_clarification -->|"回答写回原任务；预算保留"| agent
-    research_guard -->|"assess_evidence：有可用证据，优先于额度检查"| assess_evidence
-    research_guard -->|"finalize_limited_report：无可用证据<br/>先判澄清已满，再判研究预算耗尽"| finalize_limited_report
-    research_guard -->|"agent：无可用证据；澄清未满且预算尚余"| agent
-    assess_evidence -->|"request_clarification：clarify 且澄清未满"| request_clarification
-    assess_evidence -->|"generate_draft：full_report / limited_report<br/>或 continue 且预算耗尽；超限 clarify 改 limited_report"| generate_draft
-    assess_evidence -->|"agent：continue 且研究预算尚余"| agent
-    generate_draft --> verify_report
-    verify_report -->|"finalize_report：pass"| finalize_report
-    verify_report -->|"revise_report：revise 且修订次数未满"| revise_report
-    verify_report -->|"finalize_limited_report：revise 且修订次数已满"| finalize_limited_report
-    revise_report --> verify_report
-    finalize_report --> store_memory
-    store_memory -->|"正常结束：report_mode 为 full"| __end__
-    store_memory -->|"受限报告结束：report_mode 为 limited"| __end__
-    finalize_limited_report -->|"失败说明结束"| __end__
+    request_clarification -->|"用户回答，预算保留"| agent
+    research_guard -->|"有可用证据"| assess_evidence
+    research_guard -->|"无证据；澄清已满或预算耗尽"| finalize_limited_report
+    research_guard -->|"无证据；两类额度均未满"| agent
+    assess_evidence -->|"clarify，额度未满"| request_clarification
+    assess_evidence -->|"full_report / limited_report<br/>或 continue 预算耗尽<br/>或 clarify 额度已满"| generate_draft
+    assess_evidence -->|"continue，预算尚余"| agent
 
     classDef interaction fill:#ede9fe,stroke:#7c3aed,color:#111827
-    classDef sharedDelivery fill:#e0f2fe,stroke:#0284c7,color:#111827
+    classDef handoff fill:#e0f2fe,stroke:#0284c7,stroke-dasharray:5 3,color:#111827
     classDef failure fill:#fee2e2,stroke:#dc2626,color:#111827
     class request_clarification interaction
-    class finalize_report,store_memory sharedDelivery
+    class generate_draft handoff
     class finalize_limited_report failure
-    linkStyle 20 stroke:#15803d,stroke-width:3px,color:#15803d
-    linkStyle 21 stroke:#b45309,stroke-width:3px,stroke-dasharray:6 3,color:#b45309
-    linkStyle 22 stroke:#dc2626,stroke-width:3px,color:#dc2626
 ```
+
+图 1 的两个出口沿用真实节点 ID：`generate_draft` 对应图 2 的草稿入口，`finalize_limited_report` 对应图 2 的失败说明入口，不是新增节点。`tools` 合并执行四个研究工具：本地检索、当前天气、网页搜索、HTML／文字层 PDF 读取；`ask_user` 不在其中。有效追问优先；超限或参数无效的追问不取消同批普通工具，普通工具仍检查预算。
+
+### 图 2：报告核验与结束
+
+```mermaid
+flowchart TD
+    generate_draft["生成 full / limited 草稿<br/>（generate_draft）"]
+    verify_report{"模型与程序核验<br/>（verify_report）"}
+    revise_report["修订必须修改项<br/>（revise_report）"]
+    finalize_report["定稿并附来源（finalize_report）<br/>limited 加受限提示"]
+    finalize_limited_report["失败说明（finalize_limited_report）<br/>不交付未核验草稿；不存记忆"]
+    store_memory["保存或跳过记忆（store_memory）<br/>仅 full、核验通过且非时效性任务写入<br/>limited 不写入"]
+    __end__(["结束（__end__）"])
+
+    generate_draft --> verify_report
+    verify_report -->|"pass"| finalize_report
+    verify_report -->|"revise，次数未满"| revise_report
+    verify_report -->|"revise，次数已满"| finalize_limited_report
+    revise_report --> verify_report
+    finalize_report --> store_memory
+    store_memory -->|"full：正常结束"| __end__
+    store_memory -->|"limited：受限报告结束"| __end__
+    finalize_limited_report -->|"失败说明结束"| __end__
+
+    classDef delivery fill:#e0f2fe,stroke:#0284c7,color:#111827
+    classDef failure fill:#fee2e2,stroke:#dc2626,color:#111827
+    class finalize_report,store_memory delivery
+    class finalize_limited_report failure
+    linkStyle 6 stroke:#15803d,stroke-width:3px,color:#15803d
+    linkStyle 7 stroke:#b45309,stroke-width:3px,stroke-dasharray:6 3,color:#b45309
+    linkStyle 8 stroke:#dc2626,stroke-width:3px,color:#dc2626
+```
+
+绿色实线为 full 正常结束，橙色虚线为 limited 受限报告结束，红色实线为失败说明结束。full 与 limited 共用 `finalize_report → store_memory → END`；双色结束线仅展示结果区别，不是新增路由。limited 经过记忆节点但跳过写入，失败说明不经过记忆节点。
 
 完整分支说明、预算与暂停恢复机制见[当前研究流程图](docs/architecture/research_workflow.md)。
 
