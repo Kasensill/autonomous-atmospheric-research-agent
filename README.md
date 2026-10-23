@@ -226,13 +226,13 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
 两次为不同随机运行，并非严格性能 A/B，不能把用时/条数变化归为单个改动的因果收益。
 模型审查 pass 仍不能代替科学内容人工审核。
 
-可核对的原始结果：
+可核对的原始结果：原始运行产物仅保存在本地，不随仓库发布。
 
-- [核验器八题结果](docs/validation/2026-10-20/report_verification_evaluation_20261020_100009.md)
-- [相关性门槛校准（含全部原始分数）](docs/validation/2026-10-20/relevance_gate_calibration.json)
-- [原有十二题门槛前后对照](docs/validation/2026-10-20/retrieval_gate_effect.json)
-- [首次完整运行：核验失败，安全收尾](docs/validation/2026-10-20/live_output_100806.md)
-- [修复后完整运行：609字符正文与Trace](docs/validation/2026-10-20/live_output_100931.md)
+- 核验器八题结果
+- 相关性门槛校准（含全部原始分数）
+- 原有十二题门槛前后对照
+- 首次完整运行：核验失败，安全收尾
+- 修复后完整运行：609字符正文与Trace
 
 复现研究性验收（将调用配置的 API 并产生费用；无需读取或展示密钥）：
 
