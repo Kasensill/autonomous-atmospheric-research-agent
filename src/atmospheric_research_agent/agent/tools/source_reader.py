@@ -10,6 +10,32 @@ from langchain_core.tools import tool
 from ..settings import MAX_SOURCE_CHARACTERS
 
 MARKDOWN_LINK_PATTERN = re.compile(r"^\[[^\]]*\]\((https?://[^\s)]+)\)$")
+PDF_GENERIC_AUTHORS = frozenset({
+    "user", "admin", "administrator", "unknown", "anonymous", "default", "default user",
+    "owner", "system", "root", "none", "null", "n/a", "author",
+})
+
+
+def _pdf_display_metadata(title: Any, author: Any, url: str) -> tuple[str, str | None]:
+    """只整理显示元数据；不猜测机构，不回退到 PDF 创建者字段。"""
+    def clean(value: Any) -> str:
+        return " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", value).split()) if isinstance(value, str) else ""
+
+    title_text = clean(title)
+    parsed = urlparse(url)
+    candidate = unquote(title_text)
+    basename = unquote(parsed.path.rsplit("/", 1)[-1])
+    looks_like_url = bool(re.match(
+        r"(?i)^(?:[a-z][a-z0-9+.-]*://|www\.)|^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(?::\d+)?(?:[/?#].*)?$",
+        candidate,
+    ))
+    looks_like_file = bool(re.search(r"(?i)\.(?:pdf|docx?|xlsx?|pptx?|rtf|txt|wps|odt|html?)$", candidate)
+                           or re.match(r"(?i)^[a-z]:[\\/]", candidate)
+                           or (basename and candidate.casefold() == basename.casefold()))
+    display_title = title_text if title_text and not looks_like_url and not looks_like_file else f"PDF：{parsed.hostname or '未知域名'}"
+    author_text = clean(author)
+    display_author = author_text if author_text and author_text.casefold() not in PDF_GENERIC_AUTHORS else None
+    return display_title, display_author
 
 
 def _read_pdf_source(data: bytes, url: str, diagnostics: dict) -> dict[str, Any]:
@@ -36,11 +62,12 @@ def _read_pdf_source(data: bytes, url: str, diagnostics: dict) -> dict[str, Any]
     diagnostics["pdf"].update(returned_page_numbers=returned_pages,
                               evidence_character_limit_reached=evidence_truncated,
                               returned_characters=len(content))
+    title, author = _pdf_display_metadata(result.get("title"), result.get("author"), url)
     return {"status": "success", "tool": "read_source", "url": url,
             "content": content, "truncated": bool(result.get("truncated") or evidence_truncated),
             "message": message, "diagnostics": diagnostics,
-            "source": {"display_name": result.get("title") or url, "location": url,
-                       "type": "web", "author": result.get("author"),
+            "source": {"display_name": title, "location": url,
+                       "type": "web", "author": author,
                        "organization": None, "published_at": None}}
 
 
