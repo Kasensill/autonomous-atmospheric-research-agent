@@ -28,8 +28,9 @@ def test_quota_sentence_is_explicit_and_separate_from_research_budgets(used, sen
     assert messages[0].content.endswith("\n\n" + sentence)
     assert "当前研究轮次" not in messages[0].content
     assert "当前工具调用数" not in messages[0].content
-    assert f"当前研究轮次：{MAX_RESEARCH_ROUNDS}/{MAX_RESEARCH_ROUNDS}" in messages[1].content
-    assert f"当前工具调用数：{MAX_TOOL_CALLS}/{MAX_TOOL_CALLS}" in messages[1].content
+    assert "研究预算：已耗尽，不得选择 continue。" in messages[1].content
+    assert "当前研究轮次" not in messages[1].content
+    assert "当前工具调用数" not in messages[1].content
     assert "已完成澄清" not in "\n".join(m.content for m in messages)
 
 
