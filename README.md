@@ -1,14 +1,80 @@
 # Autonomous Research Agent
 
+面向大气科学的证据驱动研究 Agent：用 LangGraph 工作流输出带来源的报告，缺证据时受限交付，无法可靠交付时说明失败。
+
+## 它和普通搜索后总结有什么不同
+
 一个面向大气科学领域的学习型 Research Agent。它的目标不是“搜索后直接总结”，而是
 把问题、工具调用、证据、评估和带来源的报告串成一条可解释的 LangGraph 工作流。
+它不把搜索摘要直接当证据，也不把模型自检当作事实认证；下面的设计取舍明确了取证、核验和交付边界。
 
-## 测试实录
+## 五个设计取舍
+
+### 证据与候选分离
+
+`search_web` 只产生候选，网页须经 `read_source` 取得正文后才能成为证据，避免把摘要当作已读取的资料。用户陈述不是证据；具体事件须另找事实资料，本地知识库只解释机制、不充当事件实况，这些来源使用边界也通过提示词约束模型。见[事件取证与用户陈述](docs/architecture/research_workflow.md#事件取证与用户陈述)。
+
+### 预算由程序控制
+
+研究轮次、工具调用、修订、澄清和递归保护上限由 `settings.py` 常量决定，程序算好剩余预算再告诉模型，避免依赖模型自报额度。研究预算耗尽后基于已有证据转向交付，证据不足则受限交付或说明失败；递归超限另由入口捕获并说明中止，不保证生成报告。见[程序额度](docs/architecture/research_workflow.md#程序额度)与[配置常量](src/atmospheric_research_agent/agent/settings.py)。
+
+### 分级核验
+
+语义核验只把编造、与证据矛盾、引用不存在或错配、数字／单位／时间错误、证据冲突未说明列为必须修改；措辞偏强等只记建议、不因此拦截，避免反复改写却无法收敛。程序按必须修改项是否为空规范化 `verdict`，引用完整性与简要篇幅仍有程序硬检查，不能把模型判断视为独立事实认证。见[核验分级、复查与交付](docs/architecture/research_workflow.md#核验分级复查与交付)。
+
+### 三种结束方式
+
+正常报告、带程序提示的受限报告和失败说明分开交付，让用户区分“可支持的部分”与“未能可靠完成”。受限报告不写入长期记忆，避免把证据不全的结论固化为后续背景；失败说明也不存记忆。见[交付与记忆边界](docs/architecture/research_workflow.md#核验分级复查与交付)。
+
+### 同任务追问恢复与可观测性
+
+缺少关键信息时暂停追问，回答后在同一任务内保留状态与预算恢复，减少重新开始造成的重复取证。每次运行记录节点级 Trace，debug 模式实时追加节点序列；检查点仅在进程内有效，实时日志不等于可跨进程恢复。见[同任务暂停与恢复](docs/architecture/HITL_minimal.md)与[诊断材料](docs/architecture/research_workflow.md#--debug-诊断材料)。
+
+## 一个真实排错案例
+
+一次追问恢复后，流程因步数超限中止；补充诊断后才发现 Agent 无工具、证据评估要求继续的循环。
+根因是有证据的空转未消费研究轮次；修复将此类空转计次，并把预算耗尽后的继续请求规范化为受限报告。
+递归保护也按合法路径重新核算；Agent 为什么未调用工具仍未查清，见[定位、验证与遗留](docs/architecture/debug_log.md)。
+
+## 输出示例
+
+公开记录保留真实交付与被拦截的首稿，展示成功交付与失败边界，不代表总体成功率。
+
+### 测试实录
 
 两次真实运行展示了缺少关键条件时暂停追问用户并恢复，以及针对虚构气象站问题，核验环节拦下首稿中无证据支持的细节、修订后交付受限结论的过程。
 查看[测试实录](docs/evidence/test_evidence_2026-10-20.md)，其中保留脱敏后的报告与完整 Trace，并说明已知局限。
 
-## 当前状态：研究闭环、报告核验与同任务 HITL 已实现
+## 快速开始
+
+### 从 clone 到能跑
+
+需要 Python >=3.11；以下使用 Windows PowerShell，在 clone 后进入项目目录：
+
+```powershell
+git clone https://github.com/Kasensill/autonomous-atmospheric-research-agent.git
+cd autonomous-atmospheric-research-agent
+py -3.11 -m venv .venv
+.venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\python -m pytest --basetemp .pytest-tmp
+.venv\Scripts\python -m atmospheric_research_agent.ingestion.build_index --dry-run
+```
+
+`dev` 是 `pyproject.toml` 定义的测试依赖组。安装依赖需要下载软件包；上述离线测试与 dry-run 不调用模型或研究 API。随后按[配置](#配置)填写凭据，建库后再运行研究。
+
+| 能力 | 凭据要求 |
+| --- | --- |
+| 离线测试、知识资料 `--dry-run` 检查 | 不需要任何 key；需先安装依赖 |
+| Agent、证据评估、报告生成／核验／修订 | `DEEPSEEK_API_KEY` |
+| 本地向量建库、向量查询与 Rerank | `DASHSCOPE_API_KEY`；Rerank 专用地址按配置需要填写 |
+| 网页候选搜索 | `TAVILY_API_KEY` |
+| Open-Meteo 天气工具、HTML／PDF 来源读取 | 当前实现不需要 key，但需要联网；完整研究仍需模型凭据 |
+
+离线测试不调用 API，不等于完整研究不需要 API。
+
+## 完整流程图
+
+### 当前状态：研究闭环、报告核验与同任务 HITL 已实现
 
 当前能力统一入口如下；项目仍用于学习，不应被视为科学结论生产系统或天气预警系统。
 
@@ -127,31 +193,6 @@ src/atmospheric_research_agent/
 tests/                             # 单元测试与图流程测试
 examples/                          # Tool Calling 学习示例
 ```
-
-## 从 clone 到能跑
-
-需要 Python >=3.11；以下使用 Windows PowerShell，在 clone 后进入项目目录：
-
-```powershell
-git clone https://github.com/Kasensill/autonomous-atmospheric-research-agent.git
-cd autonomous-atmospheric-research-agent
-py -3.11 -m venv .venv
-.venv\Scripts\python -m pip install -e ".[dev]"
-.venv\Scripts\python -m pytest --basetemp .pytest-tmp
-.venv\Scripts\python -m atmospheric_research_agent.ingestion.build_index --dry-run
-```
-
-`dev` 是 `pyproject.toml` 定义的测试依赖组。安装依赖需要下载软件包；上述离线测试与 dry-run 不调用模型或研究 API。随后按下节配置凭据，建库后再运行研究。
-
-| 能力 | 凭据要求 |
-| --- | --- |
-| 离线测试、知识资料 `--dry-run` 检查 | 不需要任何 key；需先安装依赖 |
-| Agent、证据评估、报告生成／核验／修订 | `DEEPSEEK_API_KEY` |
-| 本地向量建库、向量查询与 Rerank | `DASHSCOPE_API_KEY`；Rerank 专用地址按配置需要填写 |
-| 网页候选搜索 | `TAVILY_API_KEY` |
-| Open-Meteo 天气工具、HTML／PDF 来源读取 | 当前实现不需要 key，但需要联网；完整研究仍需模型凭据 |
-
-离线测试不调用 API，不等于完整研究不需要 API。
 
 ## 配置
 
