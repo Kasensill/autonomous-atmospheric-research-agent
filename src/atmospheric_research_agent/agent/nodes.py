@@ -688,6 +688,31 @@ def research_guard_node(state: ResearchState) -> dict[str, Any]:
                                 "detail": "澄清次数达到上限且没有可用证据，直接进入失败说明，不增加研究轮次。"})
         return update
     if usable_evidence(state):
+        messages = state.get("messages", [])
+        latest_index = next((index for index in range(len(messages) - 1, -1, -1)
+                             if isinstance(messages[index], AIMessage)), None)
+        latest = messages[latest_index] if latest_index is not None else None
+        previous = messages[latest_index - 1] if latest_index is not None and latest_index > 0 else None
+        # 上一轮 continue 后未做研究的续行消费一轮；刚整理过工具批次则不重复计数。
+        just_received_results = (isinstance(previous, ToolMessage) and previous.name != ASK_USER_NAME
+                                 and not previous.additional_kwargs.get("protocol_only"))
+        if (state.get("assessment", {}).get("next_step") == "continue"
+                and latest is not None and not latest.tool_calls
+                and not just_received_results and not research_budget_exhausted(state)):
+            before = state.get("research_round", 0)
+            after = before + 1
+            remaining_rounds = max(0, MAX_RESEARCH_ROUNDS - after)
+            remaining_tools = max(0, MAX_TOOL_CALLS - state.get("tool_call_count", 0))
+            return {
+                "research_round": after,
+                "trace": [{
+                    "node": "research_guard", "event": "idle_round_counted",
+                    "detail": (f"评估要求继续研究，但 Agent 未调用工具；研究轮次 {before} → {after}，"
+                               f"剩余研究轮次 {remaining_rounds}，剩余工具调用 {remaining_tools}；已有证据进入评估。"),
+                    "research_round_before": before, "research_round_after": after,
+                    "remaining_research_rounds": remaining_rounds, "remaining_tool_calls": remaining_tools,
+                }],
+            }
         return {
             "trace": [
                 {
@@ -820,6 +845,13 @@ def assess_evidence_with_model(
         raise TypeError("证据评估模型没有返回 EvidenceAssessmentOutput。")
 
     assessment: EvidenceAssessment = output.model_dump()
+    normalization_trace = []
+    if output.next_step == "continue" and research_budget_exhausted(state):
+        assessment.update(sufficient=False, next_step="limited_report")
+        normalization_trace.append({
+            "node": "assess_evidence", "event": "assessment_next_step_normalized",
+            "detail": "程序确认研究预算已耗尽：模型 next_step=continue，规范化为 limited_report，sufficient=False。",
+        })
     limit_update = {}
     if output.next_step == "clarify" and clarifications_exhausted(state):
         limit_update = _clarification_limit_update(state, "assess_evidence")
@@ -830,6 +862,7 @@ def assess_evidence_with_model(
         "assessment": assessment,
         "clarification_question": output.clarification_question if output.next_step == "clarify" and not limit_update else None,
         "trace": [
+            *normalization_trace,
             *limit_update.get("trace", []),
             {
                 "node": "assess_evidence",

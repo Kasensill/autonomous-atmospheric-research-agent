@@ -11,7 +11,12 @@ from typing import Any
 # 图与研究循环预算：防止模型反复调用工具或让图无限循环。
 MAX_RESEARCH_ROUNDS = 4
 MAX_TOOL_CALLS = 8
-GRAPH_RECURSION_LIMIT = 30
+# 单次调用的最长正常推进路径：无追问入口 recall_memory 1 步；恢复入口
+# request_clarification 1 步。各加 4 轮 × 6 步（逐批取证并评估），再加
+# 报告阶段 4 + 2 × 2 = 8 步（含两次修订、定稿、store_memory），均为 33 步。
+# 33 × 1.2 = 39.6，取 40；这是兜底保护，不替代研究/工具/修订预算。
+# 修改研究轮次、修订上限或图结构时必须重新核算。
+GRAPH_RECURSION_LIMIT = 40
 # 报告受控修订预算；避免 Reflection 让图在写作与自检间无限循环。
 MAX_REPORT_REVISION_ROUNDS = 2
 MAX_CLARIFICATIONS = 2

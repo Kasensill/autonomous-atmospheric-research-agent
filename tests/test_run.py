@@ -1,4 +1,5 @@
 import atmospheric_research_agent.agent.run as run_module
+from atmospheric_research_agent.agent.settings import GRAPH_RECURSION_LIMIT
 
 
 class FakeGraph:
@@ -21,7 +22,7 @@ def test_run_research_starts_graph_with_initial_state(monkeypatch) -> None:
 
     assert result["final_report"] == "报告"
     assert fake_graph.received_state["question"] == "测试"
-    assert fake_graph.received_config["recursion_limit"] == 30
+    assert fake_graph.received_config["recursion_limit"] == GRAPH_RECURSION_LIMIT
     assert result["run_id"] == fake_graph.received_state["run_id"]
     assert result["run_duration_ms"] is not None
     assert result["trace"][-1]["event"] == "run_completed"
