@@ -226,7 +226,7 @@ def build_research_graph(*, checkpointer: Any = None) -> Any:
     builder.add_edge("tools", "record_results")
     builder.add_edge("record_results", "agent")
 
-    # Guard 只处理零证据终止问题；零证据不能进入草稿生成。
+    # Guard 处理零证据终止与评估要求继续后 agent 无工具的空转计次；零证据不能进入草稿生成。
     builder.add_conditional_edges(
         "research_guard",
         route_after_research_guard,
