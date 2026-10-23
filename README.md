@@ -10,8 +10,14 @@
 
 ## 当前状态：研究闭环、报告核验与同任务 HITL 已实现
 
-V1 已具备真实的本地知识库、外部工具调用与证据驱动报告能力。它仍是学习项目，
-不应被视为科学结论生产系统或天气预警系统。
+当前能力统一入口如下；项目仍用于学习，不应被视为科学结论生产系统或天气预警系统。
+
+- 证据驱动研究：工具结果整理为正式证据，报告以证据编号注明来源。
+- 同任务追问恢复：缺少关键条件时暂停等待回答，在同一进程中保留状态与预算继续研究。
+- 分级核验与修订：模型区分必须修改项与建议，程序检查引用并限制修订次数。
+- 受限报告：证据不足时只交付可支持的部分，核验失败则输出失败说明而非未核验草稿。
+- 程序化预算：研究轮次、工具调用与澄清额度由程序控制，并为无工具空转计次。
+- 可观测性与排错记录：Trace、实时节点日志和超限诊断帮助定位问题，排错结论见[排错记录](docs/architecture/debug_log.md)。
 
 ### 图 1：研究与追问
 
@@ -95,6 +101,8 @@ flowchart TD
 - `search_web(query)`：通过 Tavily 寻找公开网页候选；候选摘要不是正式证据。
 - `read_source(url)`：读取候选网页正文与可获得的标题、机构、作者、日期。
 
+`read_source` 支持有文字层的 PDF（有页数、大小、字符上限），不做 OCR；限制与失败提示见架构文档的 PDF 一节。
+
 只有本地知识片段、天气规范化结果和实际读取到的网页正文会写入 `evidence`。网页搜索
 结果仅供 Agent 选择下一步读取哪些 URL。
 
@@ -105,7 +113,7 @@ flowchart TD
 
 ```text
 data/
-  knowledge_base/                 # 50 篇大气科学 Markdown 资料
+  knowledge_base/                 # 51 篇 Markdown 知识摘要
   vector_store/                   # Chroma 运行数据（不提交）
 src/atmospheric_research_agent/
   ingestion/build_index.py        # Markdown → 分块 → Embedding → Chroma
@@ -119,6 +127,31 @@ src/atmospheric_research_agent/
 tests/                             # 单元测试与图流程测试
 examples/                          # Tool Calling 学习示例
 ```
+
+## 从 clone 到能跑
+
+需要 Python >=3.11；以下使用 Windows PowerShell，在 clone 后进入项目目录：
+
+```powershell
+git clone https://github.com/Kasensill/autonomous-atmospheric-research-agent.git
+cd autonomous-atmospheric-research-agent
+py -3.11 -m venv .venv
+.venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\python -m pytest --basetemp .pytest-tmp
+.venv\Scripts\python -m atmospheric_research_agent.ingestion.build_index --dry-run
+```
+
+`dev` 是 `pyproject.toml` 定义的测试依赖组。安装依赖需要下载软件包；上述离线测试与 dry-run 不调用模型或研究 API。随后按下节配置凭据，建库后再运行研究。
+
+| 能力 | 凭据要求 |
+| --- | --- |
+| 离线测试、知识资料 `--dry-run` 检查 | 不需要任何 key；需先安装依赖 |
+| Agent、证据评估、报告生成／核验／修订 | `DEEPSEEK_API_KEY` |
+| 本地向量建库、向量查询与 Rerank | `DASHSCOPE_API_KEY`；Rerank 专用地址按配置需要填写 |
+| 网页候选搜索 | `TAVILY_API_KEY` |
+| Open-Meteo 天气工具、HTML／PDF 来源读取 | 当前实现不需要 key，但需要联网；完整研究仍需模型凭据 |
+
+离线测试不调用 API，不等于完整研究不需要 API。
 
 ## 配置
 
@@ -190,6 +223,8 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
 
 测试不发送真实模型请求、不访问 Tavily，也不读取公开网页；外部依赖都由假对象替代。
 
+当前基线：2026-10-23，基于提交 `f005e86`，Python 3.11.9，离线测试 **341 passed**；复现命令：`.venv\Scripts\python -m pytest --basetemp .pytest-tmp`。
+
 ## 当前边界与版本路线图
 
 ### 输出质量第一批修复（2026-10-20）
@@ -202,6 +237,8 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
 - 完全重复去重补齐同批重复；这不是语义去重。核验正负例扩充至八条。
 - 离线回归 102 项通过；真实核验评测 8/8 完成、8/8 与标签一致、危险放行 0、误拦 0。
   仅为小型自建集的本次结果；首次沙箱连接失败的报告也保留，未算入质量得分。
+
+以上为历史阶段验证，非当前通过数。
 
 设计、逐条处理和验证边界见 [外部输出评价改进记录](docs/architecture/output_review_2026-10-20.md)。
 
@@ -226,6 +263,8 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
 两次为不同随机运行，并非严格性能 A/B，不能把用时/条数变化归为单个改动的因果收益。
 模型审查 pass 仍不能代替科学内容人工审核。
 
+以上为历史阶段验证，非当前通过数。
+
 可核对的原始结果：原始运行产物仅保存在本地，不随仓库发布。
 
 - 核验器八题结果
@@ -243,8 +282,8 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
 ```
 
 - 本地检索已升级为 **向量召回 + 中文 BM25 + RRF + qwen3.7-text-rerank**；
-  检索排名只表示问题与片段的相关性，不等于来源可信度。当前仅有 200 个可检索
-  知识 Chunk，缺少专题资料时应生成受限结论，而不是外推为完整结论。
+  检索排名只表示问题与片段的相关性，不等于来源可信度。当前语料为 204 个可检索
+  知识 Chunk（由 `--dry-run` 得到，日期 2026-10-23；不是已建库实测）。缺少专题资料时应生成受限结论，而不是外推为完整结论。
 - 当前已有检索与报告核验评测，以及按 ``run_id`` 关联的节点 Trace、耗时和业务事件；它们仍是
   本地命令行可读版本，尚未接入数据库、监控平台、告警或成本仪表盘。
 - 网页正文读取具有 V1 基础的 URL 安全过滤；不等于生产级的全量 SSRF 防护。
@@ -263,9 +302,10 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
    **HITL 增量（2026-10-20）**：两个澄清入口接入同任务暂停恢复；证据评估的澄清必须提供具体追问。
    完整离线回归 94 项通过；2026-10-19 的一次真实模型验收完成地点追问、北京回答、天气取证及报告交付。
    这是机制验收，不证明模型永不重复提问、数据永不过期或报告科学结论绝对正确。
-4. **V3：Multi-Agent（设计中）**：先按职责把 Coordinator / Planning、Research、Evidence Review、
-   Report Writer、Report Verification 拆为可审计的子 Agent，并通过结构化交接契约、定向补查与评测
-   证明拆分的价值；Event/Data Agent 属于后续事件研究方向的可插拔扩展，不替代这条近期主线。
+   以上为历史阶段验证，非当前通过数。
+4. **V3：Multi-Agent（规划中，未实现）**：此前按 Coordinator / Planning、Research、Evidence Review、
+   Report Writer、Report Verification 五类职责描述；具体拆分以[三 Agent 规划](docs/architecture/V3_three_agent_plan.md)为准，
+   不表示当前已实现子 Agent。Event/Data Agent 属于后续事件研究方向的可插拔扩展，不替代这条近期主线。
 
 MCP、FastAPI、Docker 与前端属于服务和产品交付层：它们会复用稳定的 `run_research()` 核心入口，
 但不抢在上述核心能力之前实现。
