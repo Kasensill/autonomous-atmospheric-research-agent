@@ -10,6 +10,7 @@ import json
 import os
 import re
 from hashlib import sha256
+from time import perf_counter
 from typing import Any, Literal
 
 from dotenv import load_dotenv
@@ -135,7 +136,7 @@ class ReportReviewOutput(BaseModel):
     reason: str
 
 
-def _create_base_model() -> ChatOpenAI:
+def _create_base_model(*, thinking: Literal["disabled", "enabled"] = "disabled") -> ChatOpenAI:
     """创建共享的 DeepSeek 模型客户端，但不赋予任何研究工具。
 
     Agent 的多轮工具调用明确关闭 DeepSeek thinking mode。该模式要求每一轮
@@ -154,7 +155,7 @@ def _create_base_model() -> ChatOpenAI:
         api_key=api_key,
         base_url=os.getenv("DEEPSEEK_BASE_URL", DEFAULT_DEEPSEEK_BASE_URL),
         temperature=0,
-        extra_body={"thinking": {"type": "disabled"}},
+        extra_body={"thinking": {"type": thinking}},
     )
 
 
@@ -175,10 +176,21 @@ def create_assessment_model() -> Any:
     )
 
 
-def create_verification_model() -> Any:
+def _verification_thinking() -> Literal["disabled", "enabled"]:
+    """核验专用实验开关；不影响 Agent、评估或写作模型。"""
+
+    load_dotenv()
+    value = os.getenv("VERIFY_THINKING", "disabled")
+    if value not in {"disabled", "enabled"}:
+        raise ValueError("VERIFY_THINKING 仅允许 disabled 或 enabled；未设置时默认为 disabled。")
+    return value
+
+
+def create_verification_model(*, thinking: Literal["disabled", "enabled"] | None = None) -> Any:
     """创建只审查报告草稿、不会调用工具或直接重写报告的模型。"""
 
-    return _create_base_model().with_structured_output(
+    mode = _verification_thinking() if thinking is None else thinking
+    return _create_base_model(thinking=mode).with_structured_output(
         ReportReviewOutput,
         method="json_mode",
     )
@@ -1081,12 +1093,23 @@ def check_citation_integrity(state: ResearchState) -> list[str]:
     return issues
 
 
-def verify_report_with_model(state: ResearchState, model: Any) -> dict[str, Any]:
+def verify_report_with_model(
+    state: ResearchState, model: Any, *, thinking: Literal["disabled", "enabled"] = "disabled",
+) -> dict[str, Any]:
     """审查草稿并只返回结构化 Review，拆出后可用假模型做离线测试。"""
 
     if not state.get("evidence"):
         raise ValueError("verify_report 需要非空 evidence，不能核验零证据草稿。")
-    output = model.invoke(_verification_messages(state))
+    started = perf_counter()
+    try:
+        output = model.invoke(_verification_messages(state))
+    except Exception as error:
+        error.add_note(
+            f"报告核验调用失败：VERIFY_THINKING={thinking}，结构化输出模式=json_mode；"
+            "未静默回退，请根据原始错误决定后续操作。"
+        )
+        raise
+    model_duration_ms = round((perf_counter() - started) * 1000, 2)
     if not isinstance(output, ReportReviewOutput):
         raise TypeError("报告审查模型没有返回 ReportReviewOutput。")
 
@@ -1130,7 +1153,8 @@ def verify_report_with_model(state: ResearchState, model: Any) -> dict[str, Any]
             {
                 "node": "verify_report",
                 "event": "report_review_completed",
-                "detail": f"报告自检完成：{review['verdict']}。{review['reason']}",
+                "detail": f"报告自检完成：{review['verdict']}。{review['reason']} thinking={thinking}。",
+                "duration_ms": model_duration_ms,
             }
         ],
     }
@@ -1139,7 +1163,8 @@ def verify_report_with_model(state: ResearchState, model: Any) -> dict[str, Any]
 def verify_report_node(state: ResearchState) -> dict[str, Any]:
     """LangGraph 节点入口：对报告草稿执行 Reflection / Verification。"""
 
-    return verify_report_with_model(state, create_verification_model())
+    thinking = _verification_thinking()
+    return verify_report_with_model(state, create_verification_model(thinking=thinking), thinking=thinking)
 
 
 def route_after_report_verification(
