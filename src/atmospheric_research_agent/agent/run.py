@@ -12,7 +12,9 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID
 from collections.abc import Callable
+from langchain_core.callbacks import BaseCallbackHandler
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.errors import GraphInterrupt, GraphRecursionError
 from langgraph.types import Command
 
 from .graph import build_research_graph
@@ -20,6 +22,87 @@ from .settings import GRAPH_RECURSION_LIMIT
 from .state import ResearchState, create_initial_state
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+class _LiveNodeTrace(BaseCallbackHandler):
+    """只观察图节点，不记录模型输入／输出；跨 interrupt/resume 延续顺序。"""
+
+    raise_error = True
+
+    def __init__(self, directory: Path) -> None:
+        self.path = directory / "node_trace.jsonl"
+        self.nodes: list[dict[str, Any]] = []
+        self.active: dict[Any, dict[str, Any]] = {}
+
+    def _append(self, entry: dict[str, Any]) -> None:
+        with self.path.open("a", encoding="utf-8") as output:
+            output.write(json.dumps({**entry, "timestamp": datetime.now(UTC).isoformat()}, ensure_ascii=False) + "\n")
+
+    def on_chain_start(self, serialized: Any, inputs: Any, *, run_id: Any,
+                       tags: list[str] | None = None, metadata: dict | None = None, **kwargs: Any) -> None:
+        metadata = metadata or {}
+        node = metadata.get("langgraph_node")
+        # graph:step 标签标记实际图节点；排除嵌套模型、路由及 Runnable 的回调。
+        if not node or not any(tag.startswith("graph:step:") for tag in tags or []):
+            return
+        if kwargs.get("name") != node:
+            return
+        entry = {"sequence": len(self.nodes) + 1, "node": node,
+                 "step": metadata.get("langgraph_step"), "event": "node_started"}
+        self.nodes.append(entry)
+        self.active[run_id] = entry
+        self._append(entry)
+
+    def on_chain_end(self, outputs: Any, *, run_id: Any, **kwargs: Any) -> None:
+        self._finish(run_id, "node_completed")
+
+    def on_chain_error(self, error: BaseException, *, run_id: Any, **kwargs: Any) -> None:
+        self._finish(run_id, "node_interrupted" if isinstance(error, GraphInterrupt) else "node_error")
+
+    def _finish(self, run_id: Any, event: str) -> None:
+        entry = self.active.pop(run_id, None)
+        if entry is not None:
+            entry["event"] = event
+            self._append(entry)
+
+
+def _invoke_with_diagnostics(
+    graph: Any, graph_input: Any, config: dict, *, phase: str,
+    directory: Path | None, live_trace: _LiveNodeTrace | None,
+) -> ResearchState:
+    """首次与恢复共用超步数诊断；不改输入、路由或预算。"""
+
+    try:
+        return graph.invoke(graph_input, config=config)
+    except GraphRecursionError as error:
+        if directory is not None:
+            try:
+                snapshot = graph.get_state(config)
+                state = snapshot.values
+                trace = state.get("trace", [])
+                diagnostic = {
+                    "error": "GraphRecursionError", "phase": phase,
+                    "run_id": state.get("run_id"), "recursion_limit": config["recursion_limit"],
+                    "node_sequence": live_trace.nodes if live_trace is not None else [],
+                    "last_executed_nodes": [item["node"] for item in trace if item.get("event") == "node_completed"],
+                    "next_nodes": list(snapshot.next),
+                    "checkpoint_step": (snapshot.metadata or {}).get("step"),
+                    "research_round": state.get("research_round", 0),
+                    "tool_call_count": state.get("tool_call_count", 0),
+                    "clarifications_used": len(state.get("clarification_history", [])),
+                    "report_revision_count": state.get("report_revision_count", 0),
+                }
+                (directory / "recursion_error.json").write_text(
+                    json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8",
+                )
+                (directory / "trace.json").write_text(
+                    json.dumps(trace, ensure_ascii=False, indent=2), encoding="utf-8",
+                )
+                error.add_note(f"超步数诊断已保存：{directory}")
+            except Exception as diagnostic_error:
+                # 保存失败不替换原始超步数异常，也不误报“诊断已保存”。
+                error.add_note(f"超步数诊断保存失败（{type(diagnostic_error).__name__}）；实时节点记录目录：{directory}")
+        raise
 
 
 def _check_debug_directory_ignored(directory: Path) -> None:
@@ -65,7 +148,8 @@ def _save_debug_materials(graph: Any, config: dict, result: ResearchState, direc
     files["evidence.json"] = json.dumps(evidence, ensure_ascii=False, indent=2)
     files["final_report.md"] = result.get("final_report") or ""
     files["final_output.txt"] = format_final_result(result, debug=True) + "\n"
-    directory.mkdir(parents=True, exist_ok=False)
+    # debug 入口已创建目录并实时写入节点记录，这里只补充结束材料。
+    directory.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
         (directory / name).write_text(content, encoding="utf-8")
 
@@ -78,15 +162,22 @@ def run_research(
     graph = build_research_graph(checkpointer=InMemorySaver())
     initial_state = create_initial_state(question)
     debug_directory = None
+    live_trace = None
     if debug:
         # run_id 由程序创建；额外校验避免它被当作任意输出路径。
         run_id = str(UUID(initial_state["run_id"]))
         debug_directory = PROJECT_ROOT / "docs" / "validation" / datetime.now().astimezone().date().isoformat() / run_id
         _check_debug_directory_ignored(debug_directory)
+        debug_directory.mkdir(parents=True, exist_ok=False)
+        live_trace = _LiveNodeTrace(debug_directory)
     started = perf_counter()
     config = {"recursion_limit": GRAPH_RECURSION_LIMIT,
               "configurable": {"thread_id": initial_state["run_id"]}}
-    result = graph.invoke(initial_state, config=config)
+    if live_trace is not None:
+        config["callbacks"] = [live_trace]
+    result = _invoke_with_diagnostics(
+        graph, initial_state, config, phase="initial", directory=debug_directory, live_trace=live_trace,
+    )
     waiting_seconds = 0.0
     while result.get("__interrupt__"):
         if answer_provider is None:
@@ -98,7 +189,10 @@ def run_research(
         while not isinstance(answer, str) or not answer.strip():
             answer = answer_provider("回答不能为空。" + prompt)
         waiting_seconds += perf_counter() - waiting_started
-        result = graph.invoke(Command(resume=answer.strip()), config=config)
+        result = _invoke_with_diagnostics(
+            graph, Command(resume=answer.strip()), config, phase="resume",
+            directory=debug_directory, live_trace=live_trace,
+        )
     finished_at = datetime.now(UTC).isoformat()
     duration_ms = round((perf_counter() - started - waiting_seconds) * 1000, 2)
     result["finished_at"] = finished_at
@@ -214,6 +308,11 @@ def main() -> None:
 
     try:
         result = run_research(arguments.question, answer_provider=read_answer, debug=arguments.debug)
+    except GraphRecursionError as error:
+        print("\n流程超过步数上限被中止，本次未完成报告。这是流程保护中止，不是系统崩溃。")
+        for note in getattr(error, "__notes__", []):
+            print(note)
+        raise SystemExit(1) from None
     except (EOFError, KeyboardInterrupt):
         print("\n已退出。本版检查点仅在内存中，关闭进程后不能恢复。")
         return
