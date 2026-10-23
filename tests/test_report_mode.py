@@ -55,7 +55,7 @@ def test_draft_rejects_unusable_evidence_without_calling_model(evidence):
 
 
 @pytest.mark.parametrize("mode", ("full", "limited"))
-def test_verified_report_saves_mode_and_limited_notice_only_at_finalize(monkeypatch, tmp_path, mode):
+def test_verified_report_only_saves_full_and_adds_limited_notice_at_finalize(monkeypatch, tmp_path, mode):
     state = state_with_evidence()
     state.update(assessment={"sufficient": mode == "full", "next_step": f"{mode}_report"})
     state.update(nodes.generate_draft_with_model(state, DraftModel()))
@@ -68,7 +68,13 @@ def test_verified_report_saves_mode_and_limited_notice_only_at_finalize(monkeypa
         assert state["final_report"] == original + "\n\n" + nodes._reference_section(nodes._numbered_evidence(state), report=original)
     path = tmp_path / "memory.json"
     monkeypatch.setattr(nodes, "save_project_memory", lambda record: save_project_memory(record, store_path=path))
-    assert nodes.store_memory_node(state)["trace"][0]["event"] == "memory_stored"
+    event = nodes.store_memory_node(state)["trace"][0]
+    if mode == "limited":
+        assert event["event"] == "memory_skipped"
+        assert event["detail"] == "受限报告证据不全，不写入长期记忆"
+        assert not path.exists()
+        return
+    assert event["event"] == "memory_stored"
     record = json.loads(path.read_text(encoding="utf-8"))[0]
     assert record["status"] == "verified_report"
     assert record["report_mode"] == mode
@@ -78,6 +84,43 @@ def test_verified_report_saves_mode_and_limited_notice_only_at_finalize(monkeypa
     context = "\n".join(message.content for message in nodes._messages_for_model(state))
     assert ("证据不全，仅作线索，不可当作结论" in context) == (mode == "limited")
     assert json.dumps(state["recalled_memories"], ensure_ascii=False) == before
+
+
+def test_old_limited_memory_is_still_recalled_with_background_warning(tmp_path):
+    state = state_with_evidence()
+    path = tmp_path / "old_memory.json"
+    save_project_memory({
+        "memory_id": "old-limited", "question": state["question"],
+        "summary": "副热带高压的下沉运动抑制云雨；证据不全。", "source_locations": ["theory.md"],
+        "created_at": "2026-09-20T00:00:00+00:00", "status": "verified_report", "report_mode": "limited",
+    }, store_path=path)
+    state["recalled_memories"] = recall_project_memory(state["question"], store_path=path)
+    assert [r["memory_id"] for r in state["recalled_memories"]] == ["old-limited"]
+    original_file = path.read_bytes()
+    original_record = json.dumps(state["recalled_memories"], ensure_ascii=False)
+    context = "\n".join(message.content for message in nodes._messages_for_model(state))
+    assert "证据不全，仅作线索，不可当作结论" in context
+    assert json.dumps(state["recalled_memories"], ensure_ascii=False) == original_record
+    assert path.read_bytes() == original_file
+
+
+@pytest.mark.parametrize("mode", [None, "unknown"])
+def test_memory_requires_explicit_full_mode(monkeypatch, mode):
+    state = state_with_evidence()
+    state.update(final_report="已核验正文 [E1]。", report_review={"verdict": "pass"})
+    if mode is not None:
+        state["report_mode"] = mode
+    monkeypatch.setattr(nodes, "save_project_memory", lambda _: pytest.fail("非 full 不应写入"))
+    event = nodes.store_memory_node(state)["trace"][0]
+    assert event["event"] == "memory_skipped" and "未明确为 full" in event["detail"]
+
+
+def test_full_unverified_report_does_not_save_memory(monkeypatch):
+    state = state_with_evidence()
+    state.update(final_report="未通过的正文", report_mode="full", report_review={"verdict": "revise"})
+    monkeypatch.setattr(nodes, "save_project_memory", lambda _: pytest.fail("未通过核验不应写入"))
+    with pytest.raises(ValueError, match="已通过 Verification"):
+        nodes.store_memory_node(state)
 
 
 def test_failure_explanation_never_reaches_memory(monkeypatch):

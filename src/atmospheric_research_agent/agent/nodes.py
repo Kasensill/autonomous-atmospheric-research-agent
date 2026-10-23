@@ -1276,7 +1276,7 @@ def finalize_report_node(state: ResearchState) -> dict[str, Any]:
 
 
 def store_memory_node(state: ResearchState) -> dict[str, list[TraceEntry]]:
-    """仅持久化已通过核验的最终报告，避免把失败草稿写成历史事实。"""
+    """仅持久化明确为 full、通过核验且非时效性的最终报告。"""
 
     final_report = state.get("final_report")
     review = state.get("report_review")
@@ -1284,6 +1284,12 @@ def store_memory_node(state: ResearchState) -> dict[str, list[TraceEntry]]:
         raise ValueError("store_memory 需要已生成的 final_report。")
     if not review or review.get("verdict") != "pass":
         raise ValueError("store_memory 只能保存已通过 Verification 的报告。")
+
+    mode = state.get("report_mode")
+    if mode != "full":
+        reason = ("受限报告证据不全，不写入长期记忆" if mode == "limited"
+                  else "报告模式未明确为 full，不写入长期记忆")
+        return {"trace": [{"node": "store_memory", "event": "memory_skipped", "detail": reason}]}
 
     if (is_time_sensitive_question(_task_question(state))
             or any(item.get("source_type") == "weather" for item in state.get("evidence", []))):
@@ -1294,7 +1300,7 @@ def store_memory_node(state: ResearchState) -> dict[str, list[TraceEntry]]:
         question=_task_question(state),
         final_report=final_report,
         evidence=state.get("evidence", []),
-        report_mode=state.get("report_mode", _report_mode(state)),
+        report_mode=mode,
     )
     save_project_memory(record)
     return {
