@@ -61,7 +61,7 @@ def render_results(task: ResearchSession) -> None:
     d.metric("执行耗时", f"{task.elapsed_ms / 1000:.1f} 秒")
     st.caption("耗时不含等待回答；证据数量包含原始记录，不代表全部适用或结论可靠。")
 
-    report, evidence, trace = st.tabs(["研究报告", "证据与核验", "运行轨迹 · Trace"])
+    report, evidence = st.tabs(["研究报告", "证据与核验"])
     with report:
         if task.status == "completed":
             if task.ending == "失败说明":
@@ -78,10 +78,6 @@ def render_results(task: ResearchSession) -> None:
             st.info("已保留本会话可读取的证据和轨迹。不自动重试，避免重复请求；可下载后新建任务。")
         else:
             st.info("研究尚未结束。补充条件后继续同一任务，草稿不会作为最终报告交付。")
-        for index, item in enumerate(state.get("clarification_history", []), 1):
-            with st.expander(f"补充条件 {index}"):
-                st.write("追问：", item.get("question", ""))
-                st.write("回答：", item.get("answer", ""))
     with evidence:
         review = state.get("report_review")
         if review:
@@ -96,7 +92,23 @@ def render_results(task: ResearchSession) -> None:
             st.caption("尚未取得正式证据。搜索候选不在这里冒充证据。")
         st.download_button("下载原始证据 JSON", task.export_json("evidence"),
                            file_name=f"evidence_{state['run_id']}.json", mime="application/json")
-    with trace:
+    # 放在结果页底部，不依赖当前选择哪个报告／证据页签。
+    st.divider()
+    st.subheader("本次研究记录")
+    with st.expander("问题与补充记录", expanded=False):
+        st.write("研究问题：", state["question"])
+        history = state.get("clarification_history", [])
+        if not history:
+            st.caption("本次没有已完成的追问。")
+        for index, item in enumerate(history, 1):
+            st.markdown(f"**补充条件 {index}**")
+            st.write("追问：", item.get("question", ""))
+            st.write("回答：", item.get("answer", ""))
+    with st.expander("运行记录与完整 Trace", expanded=False):
+        st.caption(f"开始时间（UTC）：{state.get('started_at', '未记录')} · "
+                   f"结束时间（UTC）：{state.get('finished_at') or '尚未结束'}")
+        st.caption(f"研究轮次：{state.get('research_round', 0)} / {MAX_RESEARCH_ROUNDS} · "
+                   f"报告修订：{state.get('report_revision_count', 0)} 次")
         events = state.get("trace", [])
         st.caption("Trace 是节点和业务事件记录；下载文件保留完整事件字段。")
         rows = [{"序号": index, "节点": item.get("node", ""),
@@ -105,6 +117,9 @@ def render_results(task: ResearchSession) -> None:
                 for index, item in enumerate(events, 1)]
         if rows:
             st.dataframe(rows, use_container_width=True, hide_index=True)
+            st.json(events, expanded=False)
+        else:
+            st.caption("本次尚无 Trace 事件。")
         st.download_button("下载完整 Trace", task.export_json("trace"),
                            file_name=f"trace_{state['run_id']}.json", mime="application/json")
     st.caption(f"任务编号：{state['run_id']}")
@@ -163,7 +178,7 @@ def main() -> None:
             st.caption("开始后会调用已配置的模型和工具，可能产生 API 费用。本版支持文本问题和公开链接，不支持文件上传。")
     else:
         # 任务的原始问题是唯一数据来源，不依赖编辑控件在重绘时的默认值。
-        st.text_area("研究问题（本任务已固定）", value=task.state["question"], height=135,
+        st.text_area("研究问题", value=task.state["question"], height=135,
                      key=f"active_question_{task.state['run_id']}", disabled=True)
 
     execute = task is not None and task.status == "ready"
