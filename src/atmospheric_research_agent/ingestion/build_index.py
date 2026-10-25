@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,7 +32,7 @@ MAX_CHUNK_CHARACTERS = 1_200
 CHUNK_OVERLAP_CHARACTERS = 120
 EMBEDDING_BATCH_SIZE = 10
 # 这些内容用于人类追溯原始 Markdown，不是能直接支持研究结论的知识片段。
-NON_RETRIEVABLE_SECTION_TITLES = frozenset({"资料来源", "参考资料", "参考文献"})
+NON_RETRIEVABLE_SECTION_TITLES = frozenset({"资料来源", "参考资料", "参考文献", "资料说明", "来源与许可", "提取说明"})
 
 
 @dataclass(frozen=True)
@@ -59,7 +61,11 @@ def find_markdown_files(knowledge_base_dir: Path) -> list[Path]:
 
 
 def _split_long_text(text: str) -> list[str]:
-    """将异常长的小节按字符窗口切开，并保留少量重叠上下文。"""
+    """优先在段落、句末和空白边界分片；超长无边界内容才回退到字符。
+
+    overlap 是最多 120 字符的上下文窗口，尽量从词边界开始；不能保证公式
+    或跨页表格具有完整语义，原文导入时仍须剔除不可靠的提取结果。
+    """
     if len(text) <= MAX_CHUNK_CHARACTERS:
         return [text]
 
@@ -68,13 +74,27 @@ def _split_long_text(text: str) -> list[str]:
     while start < len(text):
         end = min(start + MAX_CHUNK_CHARACTERS, len(text))
         if end < len(text):
-            newline = text.rfind("\n", start, end)
-            if newline > start + MAX_CHUNK_CHARACTERS // 2:
-                end = newline
+            minimum = start + MAX_CHUNK_CHARACTERS // 2
+            paragraph = text.rfind("\n\n", minimum, end)
+            if paragraph != -1:
+                end = paragraph + 2
+            else:
+                sentences = list(re.finditer(r"[。！？!?](?:\s|$)|\.(?:\s+|$)", text[minimum:end]))
+                if sentences:
+                    end = minimum + sentences[-1].end()
+                else:
+                    whitespace = list(re.finditer(r"\s+", text[minimum:end]))
+                    if whitespace:
+                        end = minimum + whitespace[-1].end()
         parts.append(text[start:end].strip())
         if end == len(text):
             break
-        start = max(end - CHUNK_OVERLAP_CHARACTERS, start + 1)
+        overlap_start = max(end - CHUNK_OVERLAP_CHARACTERS, start + 1)
+        # 不为保留固定字符数而从英文词中间开始；短至不足一个词时取消重叠。
+        if overlap_start > 0 and text[overlap_start - 1:overlap_start + 1].isalnum():
+            boundary = re.search(r"\s+", text[overlap_start:end])
+            overlap_start = overlap_start + boundary.end() if boundary else end
+        start = overlap_start
     return [part for part in parts if part]
 
 
@@ -91,50 +111,73 @@ def _is_retrievable_section(section_name: str) -> bool:
 
 
 def split_markdown_file(file_path: Path, knowledge_base_dir: Path) -> list[KnowledgeChunk]:
-    """按一级和二级标题切分一个知识文档，并保留可引用的层级元数据。"""
+    """按 1–6 级标题保留章节路径；单行 corpus-meta 注释提供原文溯源。"""
     relative_path = file_path.relative_to(knowledge_base_dir)
     category = relative_path.parts[0] if len(relative_path.parts) > 1 else "未分类"
     lines = file_path.read_text(encoding="utf-8").splitlines()
 
     title = file_path.stem
     section = "概述"
-    sections: list[tuple[str, str]] = []
+    sections: list[tuple[str, str, dict[str, str]]] = []
     buffer: list[str] = []
+    section_levels: dict[int, str] = {}
+    document_metadata: dict[str, str] = {}
 
     def flush() -> None:
         content = "\n".join(buffer).strip()
-        if content and _is_retrievable_section(section):
-            sections.append((section, content))
+        if content and all(_is_retrievable_section(name) for name in section_levels.values()):
+            sections.append((section, content, document_metadata.copy()))
         buffer.clear()
 
     for line in lines:
-        if line.startswith("# "):
+        if line.startswith("<!-- corpus-meta: ") and line.endswith(" -->"):
             flush()
-            title = line[2:].strip() or title
+            metadata = json.loads(line[len("<!-- corpus-meta: "):-len(" -->")])
+            if not isinstance(metadata, dict) or any(not isinstance(v, str) for v in metadata.values()):
+                raise ValueError(f"corpus-meta 必须是字符串字典：{relative_path}")
+            document_metadata.update(metadata)
+            continue
+        heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+        if heading and len(heading[1]) == 1:
+            flush()
+            title = heading[2] or title
             section = "概述"
-        elif line.startswith("## "):
+            section_levels.clear()
+        elif heading:
             flush()
-            section = line[3:].strip() or "概述"
+            level = len(heading[1])
+            section_levels = {key: value for key, value in section_levels.items() if key < level}
+            section_levels[level] = heading[2]
+            section = " > ".join(section_levels.values())
         else:
             buffer.append(line)
     flush()
 
     chunks: list[KnowledgeChunk] = []
-    for section_index, (section_name, content) in enumerate(sections):
+    for section_index, (section_name, content, section_metadata) in enumerate(sections):
         for part_index, part in enumerate(_split_long_text(content)):
             display_source = f"知识库：{category} > {title} > {section_name}"
             text = f"# {title}\n## {section_name}\n{part}"
+            if section_metadata:
+                text = (f"资料性质：{section_metadata.get('content_kind', '未分类')}；"
+                        f"适用范围：{section_metadata.get('source_scope', '未注明')}\n"
+                        f"原始来源：{section_metadata.get('source_url', '')}；"
+                        f"作者：{section_metadata.get('source_author', '')}；"
+                        f"发表时间：{section_metadata.get('published_at', '')}\n" + text)
             chunks.append(
                 KnowledgeChunk(
                     chunk_id=_make_chunk_id(relative_path, section_index, part_index),
                     text=text,
                     metadata={
+                        **section_metadata,
                         "source_type": "local_knowledge",
                         "source_path": relative_path.as_posix(),
                         "category": category,
                         "title": title,
                         "section": section_name,
                         "display_source": display_source,
+                        # 页码标签来自原文导入文件，不根据片段顺序猜测印刷页码。
+                        "source_page": section_name.rsplit(" > ", 1)[-1] if "PDF第" in section_name else "",
                     },
                 )
             )

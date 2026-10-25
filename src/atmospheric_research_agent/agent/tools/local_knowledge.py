@@ -56,6 +56,11 @@ def _source_from_metadata(metadata: dict[str, Any] | None) -> dict[str, str]:
 
     source = metadata or {}
     return {
+        **({"extraction_note": "PDF文字层选段未完整转写图、表与二维公式；涉及计算、图示或精确表格值时须回原始PDF核对，不自行补全。"}
+           if source.get("source_page") else {}),
+        **{key: source[key] for key in ("source_url", "source_page", "doi", "license",
+                                       "content_kind", "source_scope", "source_author", "published_at")
+           if source.get(key)},
         "display_name": source.get("display_source", "知识库：未标注来源"),
         "location": source.get("source_path", ""),
         "type": source.get("source_type", "local_knowledge"),

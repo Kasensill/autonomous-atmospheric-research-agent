@@ -38,6 +38,8 @@ class EvidenceRecord(TypedDict, total=False):
 
     # 程序根据来源与正文生成的稳定 ID；报告中的 [E1] 等编号由它排序得来。
     evidence_id: str
+    # 本地检索命中的原始切片编号，与本轮报告 E 编号不同。
+    chunk_id: str
     # 本次确实可支持报告主张的正文片段，而不是网页搜索摘要。
     content: str
     # 给人阅读的来源名称，例如“知识库：大气动力学 > 急流 > 形成机制”。
@@ -52,6 +54,16 @@ class EvidenceRecord(TypedDict, total=False):
     author_or_organization: str
     # 网页发表时间或天气观测时间；没有可靠值时不填写。
     published_or_observed_at: str
+    # 本地授权原文的原始链接、PDF页序、DOI与许可；旧摘要没有时不填写。
+    source_url: str
+    source_page: str
+    doi: str
+    license: str
+    # 区分一般机制、事件事后分析和诊断方法，均不自动成为观测实况。
+    content_kind: str
+    source_scope: str
+    # PDF文字层中图、表及二维公式提取的限制，避免补造缺失内容。
+    extraction_note: str
     # 当前天气有效时间（带时区）及抓取时间；用于恢复后重新检查时效性。
     valid_at: str | None
     fetched_at: str | None

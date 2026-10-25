@@ -25,6 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0,<9.0"]
 ui = ["streamlit>=1.40,<2.0"]
+corpus = ["PyMuPDF>=1.24,<2.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

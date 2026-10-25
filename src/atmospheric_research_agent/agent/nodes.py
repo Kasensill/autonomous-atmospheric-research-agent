@@ -79,7 +79,8 @@ AGENT_SYSTEM_PROMPT = """你是一个面向大气科学问题的内部研究 Age
 - 当问题指向特定日期和地点的具体天气事件（过去的或正在发生的）时，先核实事件事实，再用本地知识库解释机制：
   · 事件事实（时间、地点、实测量级、影响范围）优先取自实况观测、官方调查或发布、同行评审论文或权威媒体；
   · 区分三类资料并在使用时说明其性质：预报（事前发布）、实况或事后分析、一般机制背景。预报不得当作实况使用；
-  · 本地知识库只用于解释机制，不能作为事件事实的依据；
+  · 本地知识库中的一般机制背景只用于解释机制，不能作为事件事实的依据；标为 event_analysis 且带原始文献与页码的本地事件文献可以支持其明确记载的事件分析，但须区分观测、再分析和数值试验，不得把模拟结果写成实测；
+  · 本地 diagnostic_checklist 是诊断方法，不是事件事实。事件机制问题可定向检索相关诊断清单作为资料需求参考；区分必要资料与可选交叉验证，不因缺少一个可选指数就要求无限补查；
   · 只找到预报，或只找到邻近地区的资料（例如问济宁却只有济南的解读）时，如实说明，不得写成目标地点的实况。
 - search_web 只产生候选来源，不产生证据，取得网页证据至少需要搜索和读取两个步骤。
 - 事件类问题在事件事实（尤其实况）尚未取得时，不要把剩余研究轮次用于一般机制检索；先读取其他候选来源或换检索词寻找实况；确认确实找不到实况后，才转向本地知识库解释机制。
@@ -554,11 +555,16 @@ def _evidence_from_local_knowledge(message: ToolMessage, result: dict[str, Any])
         evidence_records.append(
             {
                 "evidence_id": evidence_id,
+                **({"chunk_id": item["chunk_id"]} if item.get("chunk_id") else {}),
                 "content": content,
                 "source_display_name": source.get("display_name", "知识库：未标注来源"),
                 "source_location": source_location,
                 "source_type": "local_knowledge",
                 "tool_name": message.name or "search_local_knowledge",
+                **{key: source[key] for key in ("source_url", "source_page", "doi", "license",
+                                               "content_kind", "source_scope", "extraction_note") if source.get(key)},
+                **({"author_or_organization": source["source_author"]} if source.get("source_author") else {}),
+                **({"published_or_observed_at": source["published_at"]} if source.get("published_at") else {}),
             }
         )
     return evidence_records
@@ -821,6 +827,7 @@ def _assessment_messages(state: ResearchState) -> list[BaseMessage]:
 - 区分用户条件缺失与证据缺口。用户问“能否据此判断”时，“不能判断”可以是完成该问的正确结论；已有天气可描述而缺少气候基准时，应交付已有事实并说明不能比较，不得为补齐资料而追问比较尺度。只有用户要求实际计算比较而缺少必要定义时才澄清。
 - 不得要求用户确认是否接受合成资料；任务给定的材料性质应如实标明，不把资料来源选择转交用户。需要补资料时选择 continue，无法补足时 limited_report，不因此阻断已有可交付部分。
 - 对指向具体日期和地点事件的问题，如果现有证据只有一般机制背景、缺少事件事实（时间、地点、实测或官方资料），sufficient 应为 false，并在 missing_points 里写明"缺少事件事实"；不得因机制背景充足而判为充分。证据只有预报而没有实况时，同样在 missing_points 里说明。
+- diagnostic_checklist 只能帮助判断资料需求，不是事件事实；仅核对当前问题必要的资料，缺少可选指数不自动判为不充分。event_analysis 应按原文范围区分观测、再分析和模拟结果，不把本地存储位置当作可靠性认证。
 - reason 里不得描述预算余量或剩余额度（研究轮次、工具调用、澄清次数均由程序记录，以程序给出的数字为准）；需要继续检索时，只在 missing_points 里写明还缺什么。
 - limitation_reasons 可多选：tool_capability_gap（现有工具无法提供所需数据）、
   evidence_conflict（证据冲突）、insufficient_evidence（资料不足）；这是模型判断，不是程序确认的事实。
@@ -971,7 +978,10 @@ def _reference_section(numbered_evidence: list[dict[str, Any]], *, report: str |
             location_text = f"[来源页]({location})"
         else:
             location_text = location
-        details = "；".join(part for part in [source_details, location_text] if part)
+        original_url = _reference_url(evidence.get("source_url", ""))
+        original_text = f"[原始文献]({original_url})" if original_url.startswith(("http://", "https://")) else ""
+        page = _plain_reference_text(evidence.get("source_page", ""))
+        details = "；".join(part for part in [source_details, location_text, original_text, page] if part)
         suffix = f"（{details}）" if details else ""
         lines.append(f"- [{evidence['citation_id']}] {display_name}{suffix}")
     return "\n".join(lines)
