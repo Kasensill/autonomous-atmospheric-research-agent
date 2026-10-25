@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 from .settings import WEATHER_EVIDENCE_MAX_AGE_SECONDS
+from .clock import reference_now
 
 
 def is_stale_weather(record: dict, *, now: datetime | None = None) -> bool:
@@ -23,4 +24,5 @@ def is_stale_weather(record: dict, *, now: datetime | None = None) -> bool:
 
 
 def usable_evidence(state: dict, *, now: datetime | None = None) -> list[dict]:
-    return [record for record in state.get("evidence", []) if not is_stale_weather(record, now=now)]
+    current = now if now is not None else reference_now(state)
+    return [record for record in state.get("evidence", []) if not is_stale_weather(record, now=current)]

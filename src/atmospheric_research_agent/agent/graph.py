@@ -29,6 +29,7 @@ from .nodes import (
     verify_report_node,
 )
 from .state import ResearchState
+from .resume import ResumeValidatedGraph
 from .evidence import usable_evidence
 from .tools.clarification import ASK_USER_NAME
 from .settings import (MAX_TOOL_CALLS, research_budget_exhausted,
@@ -267,4 +268,4 @@ def build_research_graph(*, checkpointer: Any = None) -> Any:
     builder.add_edge("finalize_limited_report", END)
     builder.add_edge("request_clarification", "agent")
 
-    return builder.compile(checkpointer=checkpointer)
+    return ResumeValidatedGraph(builder.compile(checkpointer=checkpointer))

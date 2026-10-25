@@ -28,7 +28,7 @@ flowchart TD
     record_results --> agent
     request_clarification -->|"用户回答，预算保留"| agent
     research_guard -->|"有可用证据"| assess_evidence
-    research_guard -->|"无证据；澄清已满或预算耗尽"| finalize_limited_report
+    research_guard -->|"无证据；明确停研、澄清已满或预算耗尽"| finalize_limited_report
     research_guard -->|"无证据；两类额度均未满"| agent
     assess_evidence -->|"clarify，额度未满"| request_clarification
     assess_evidence -->|"full_report / limited_report<br/>或 continue 预算耗尽<br/>或 clarify 额度已满"| generate_draft
@@ -126,6 +126,12 @@ flowchart TD
 用户补充属于用户陈述，不是正式证据：不能标 E 编号或写成已核实事实；与证据不一致时，写“用户陈述与证据不一致，无法核实”并列入局限性，不称为证据之间的分歧。不同正式证据对同一时间、数值或名称不一致时，写作和修订提示要求明写分歧、分别标注引用，不择一隐去，也不自行判断孰是孰非。这些是模型提示约束，不是独立的程序事实认证器。
 
 ## interrupt 与同任务恢复
+
+Agent 的无工具协议除 `assess` 外，还接受带非空 `stop_reason` 的 `decision=stop`，明确停止进一步取证；理由保存在 `research_stop_reason`，不是正式证据。无可用证据时，守卫直接进入失败说明，不再消耗空研究轮次；有证据时仍进入评估，评估若要求 `continue` 则程序规范化为 `limited_report`，草稿仍须核验。停止理由留在 State 与 Trace，失败正文只陈述程序确认的工具执行及取证结果，不直接复述模型理由，也不把停研称为预算耗尽。提示词禁止仅凭地名陌生或尚未找到资料就停研；这部分目标有效性判断仍依赖模型，不是地名存在性验证器。
+
+各模型阶段收到程序提供的 UTC 与北京时间。默认每次调用读取实际时钟；Python 入口可显式传入带时区的 `reference_time` 用于固定资料回放，天气有效性检查使用同一时间基准，不从问题文字自动推断回放时钟，也不以 `started_at` 代替当前时间。无可用证据的失败说明会区分已过期、有效时间无法确认与时间晚于基准的天气记录，不把旧天气数值写成当前天气。
+
+明确要求“一句话”时，草稿正文采用单句，不套用默认三章节结构，必要限定与引用放在同一句中，资料来源仍由程序另附。程序检查多句、分节、列表及多段等格式问题，发现后通过现有修订预算要求修改，不直接截断正文；这不是完整的自然语言语法分析器。
 
 `interrupt` 在 `request_clarification` 内，不在 `tools`。追问工具的协议回应已在 `agent` 关闭；暂停节点在 `interrupt` 前只读取并校验追问，不调用模型或工具、不写 State。用户回答后追加消息、问答历史，清空待追问和旧评估，沿固定边回 `agent`，不重走入口，不重置预算。
 

@@ -1,0 +1,27 @@
+{
+  "version": "live-pilot-2026-10-25-v1",
+  "cases": [
+    {
+      "id": "L01", "category": "真实本地检索", "family": "live_local_jet",
+      "question": "请查询内部知识库，简要解释850 hPa低空急流如何支持强降水，以及它为何不能单独证明某次暴雨成因。",
+      "answers": [], "required_tools": ["search_local_knowledge"],
+      "required": ["真实本地检索取得相关资料", "解释水汽输送与动力配合", "保留非充分条件及事件归因边界"],
+      "forbidden": ["将知识库机制当成特定事件实况", "只因调用了检索工具就判检索成功"]
+    },
+    {
+      "id": "L02", "category": "真实网页取证", "family": "live_web_high_pressure",
+      "question": "请搜索并读取英国Met Office或美国国家气象局的公开网页，简要解释高压为何常伴晴朗天气，并说明是否必然没有降雨。注明来源，不以搜索摘要作证据。",
+      "answers": [], "required_tools": ["search_web", "read_source"],
+      "required": ["真实搜索后读取选定候选正文", "核对正文与机构及来源URL", "限定高压天气倾向，避免绝对化"],
+      "forbidden": ["摘要冒充正文", "未取得正文却称已核实", "把任意商业网页冒充指定机构"]
+    },
+    {
+      "id": "L03", "category": "真实天气与澄清", "family": "live_weather_clarification",
+      "question": "请查当前天气并简要判断是否适合户外活动。",
+      "clarify_first": true, "required_tools": ["get_current_weather"],
+      "answers": ["地点是北京，计划在公园步行30分钟，只需天气方面的一般建议。", "北京，公园步行30分钟。"],
+      "required": ["首次研究工具前先追问地点", "取得当前有效数据，保留产品性质和时间", "建议范围限于已有天气要素"],
+      "forbidden": ["猜地点", "模型条件称站点实测", "无证据确认空气质量或预警状态"]
+    }
+  ]
+}

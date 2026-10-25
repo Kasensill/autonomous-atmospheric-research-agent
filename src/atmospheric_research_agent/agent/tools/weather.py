@@ -1,6 +1,7 @@
 """指定地区的当前天气查询工具（Open-Meteo）。"""
 
 import json
+from math import isfinite
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 from typing import Any
@@ -120,6 +121,33 @@ def query_current_weather(location: str) -> dict[str, Any]:
             "location": clean_location,
             "message": "天气服务没有返回当前条件。",
         }
+
+    numeric_fields = (
+        "temperature_2m", "apparent_temperature", "relative_humidity_2m", "precipitation",
+        "rain", "showers", "snowfall", "weather_code", "cloud_cover", "wind_speed_10m", "wind_direction_10m",
+    )
+    invalid_fields = []
+    if not isinstance(current, dict):
+        invalid_fields.append("current")
+    else:
+        for field in numeric_fields:
+            value = current.get(field)
+            if value is None:  # 未提供的字段继续明确显示缺失，不把它补成零。
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value):
+                invalid_fields.append(field)
+            elif field in {"relative_humidity_2m", "cloud_cover"} and not 0 <= value <= 100:
+                invalid_fields.append(field)
+            elif field == "wind_direction_10m" and not 0 <= value <= 360:
+                invalid_fields.append(field)
+            elif field in {"precipitation", "rain", "showers", "snowfall", "wind_speed_10m"} and value < 0:
+                invalid_fields.append(field)
+            elif field == "weather_code" and (value < 0 or int(value) != value):
+                invalid_fields.append(field)
+    if invalid_fields:
+        return {"status": "error", "tool": "get_current_weather", "location": clean_location,
+                "message": "天气服务返回无效的当前条件字段：" + ", ".join(invalid_fields),
+                "diagnostics": {"invalid_fields": invalid_fields}}
 
     timezone = weather_data.get("timezone", resolved_location.get("timezone", "未标注时区"))
     weather_code = current.get("weather_code")

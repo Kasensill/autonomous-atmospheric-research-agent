@@ -156,11 +156,13 @@ def _save_debug_materials(graph: Any, config: dict, result: ResearchState, direc
 
 def run_research(
     question: str, *, answer_provider: Callable[[str], str] | None = None, debug: bool = False,
+    reference_time: str | None = None,
 ) -> ResearchState:
     """同进程运行与恢复；没有回答接收器时将暂停结果返回给调用者。"""
 
     graph = build_research_graph(checkpointer=InMemorySaver())
-    initial_state = create_initial_state(question)
+    initial_state = (create_initial_state(question, reference_time=reference_time)
+                     if reference_time is not None else create_initial_state(question))
     debug_directory = None
     live_trace = None
     if debug:

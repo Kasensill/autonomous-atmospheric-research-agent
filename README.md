@@ -109,7 +109,7 @@ flowchart TD
     record_results --> agent
     request_clarification -->|"用户回答，预算保留"| agent
     research_guard -->|"有可用证据"| assess_evidence
-    research_guard -->|"无证据；澄清已满或预算耗尽"| finalize_limited_report
+    research_guard -->|"无证据；明确停研、澄清已满或预算耗尽"| finalize_limited_report
     research_guard -->|"无证据；两类额度均未满"| agent
     assess_evidence -->|"clarify，额度未满"| request_clarification
     assess_evidence -->|"full_report / limited_report<br/>或 continue 预算耗尽<br/>或 clarify 额度已满"| generate_draft

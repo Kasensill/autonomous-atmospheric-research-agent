@@ -15,6 +15,7 @@ from uuid import uuid4
 from typing_extensions import TypedDict
 
 from langchain_core.messages import BaseMessage
+from .clock import parse_reference_time
 
 
 class ResearchPlan(TypedDict, total=False):
@@ -172,6 +173,8 @@ class ResearchState(TypedDict, total=False):
     run_id: str
     # 本次图运行创建时的 UTC 时间。
     started_at: str
+    # 可选的带时区回放基准；None 表示每次调用读取实际时钟，不以启动时间冻结“现在”。
+    reference_time: str | None
     # 图结束时的 UTC 时间；刚创建 State 时为 None。
     finished_at: str | None
     # 从开始到 END 的总耗时，单位毫秒；刚创建 State 时为 None。
@@ -199,6 +202,8 @@ class ResearchState(TypedDict, total=False):
     tool_call_count: int
     # 程序确认的停止原因；与 assessment 中模型推测的能力缺口等原因分开。
     program_limitations: list[str]
+    # Agent 明确停止继续取证的理由；不是证据。有证据仍须评估、写作和核验。
+    research_stop_reason: str | None
 
     # Evidence Review 节点的最近一次判断；决定继续、澄清还是进入报告阶段。
     assessment: EvidenceAssessment
@@ -224,7 +229,7 @@ class ResearchState(TypedDict, total=False):
     trace: Annotated[list[TraceEntry], add]
 
 
-def create_initial_state(question: str) -> ResearchState:
+def create_initial_state(question: str, *, reference_time: str | None = None) -> ResearchState:
     """为一次新研究任务创建明确的初始 State。
 
     LangGraph 不会自动替未传入的字段补默认值。因此入口程序应调用这个函数，
@@ -234,6 +239,8 @@ def create_initial_state(question: str) -> ResearchState:
     clean_question = question.strip()
     if not clean_question:
         raise ValueError("研究问题不能为空。")
+    if reference_time is not None:
+        parse_reference_time(reference_time)
 
     started_at = datetime.now(UTC).isoformat()
     run_id = str(uuid4())
@@ -241,6 +248,7 @@ def create_initial_state(question: str) -> ResearchState:
         "question": clean_question,
         "run_id": run_id,
         "started_at": started_at,
+        "reference_time": reference_time,
         "finished_at": None,
         "run_duration_ms": None,
         "messages": [],
@@ -249,6 +257,7 @@ def create_initial_state(question: str) -> ResearchState:
         "research_round": 0,
         "tool_call_count": 0,
         "program_limitations": [],
+        "research_stop_reason": None,
         "clarification_question": None,
         "clarification_history": [],
         "final_report": None,

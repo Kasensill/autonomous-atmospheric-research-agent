@@ -10,6 +10,8 @@ from langchain_core.tools import tool
 from ..settings import MAX_SOURCE_CHARACTERS
 
 MARKDOWN_LINK_PATTERN = re.compile(r"^\[[^\]]*\]\((https?://[^\s)]+)\)$")
+# 网页提取的启发式解码质量门槛；不代表事实真实性或完整乱码识别。
+HTML_MAX_INVALID_CHARACTER_RATIO = 0.02
 PDF_GENERIC_AUTHORS = frozenset({
     "user", "admin", "administrator", "unknown", "anonymous", "default", "default user",
     "owner", "system", "root", "none", "null", "n/a", "author",
@@ -152,6 +154,16 @@ def read_public_source(url: str) -> dict[str, Any]:
         )
         if not content:
             return failure("网页正文读取失败：未能从网页提取可读正文。", clean_url)
+        if not isinstance(content, str):
+            return failure("网页正文读取失败：提取结果不是文本。", clean_url)
+        invalid_count = sum(
+            char == "\ufffd" or (ord(char) < 32 and char not in "\n\r\t") or 127 <= ord(char) < 160
+            for char in content
+        )
+        diagnostics["text_quality"] = {"characters": len(content), "invalid_characters": invalid_count,
+                                       "invalid_ratio": invalid_count / len(content)}
+        if invalid_count / len(content) > HTML_MAX_INVALID_CHARACTER_RATIO:
+            return failure("网页正文读取失败：正文含大量替换字符或异常控制字符，无法可靠读取。", clean_url)
         metadata = trafilatura.extract_metadata(downloaded, default_url=clean_url)
     except Exception as error:
         # 第三方异常文本可能包含正文，只暴露阶段和异常类型。
