@@ -69,6 +69,15 @@ WEB_SEARCH_TIMEOUT_SECONDS = 15
 WEB_SEARCH_MAX_RESULTS = 5
 WEATHER_REQUEST_TIMEOUT_SECONDS = 15
 MAX_SOURCE_CHARACTERS = 12_000
+# 首版命令行材料限额；只限制送入本任务的材料，不改变研究预算，均可按验收结果调整。
+MATERIAL_MAX_FILES = 3
+MATERIAL_MAX_CHARS_TOTAL = 20_000
+# 文本替换字符或异常控制字符比例超过此值时拒绝，避免把乱码送入模型；可调。
+MATERIAL_MAX_GARBLED_RATIO = 0.02
+# auto 角色判定词表，可调；仅用于选择材料用途，不判断内容真假。
+MATERIAL_REFERENCE_WORDS = ("这份", "该份", "此份", "附件", "上传的", "材料", "文件", "文档", "报告", "论文")
+MATERIAL_TEXT_TASK_WORDS = ("总结", "概括", "摘要", "提炼", "梳理", "分析论证", "检查论证", "比较", "对比", "翻译", "解读")
+MATERIAL_VERIFICATION_WORDS = ("核实", "核对", "是否真实", "是否属实", "验证", "真假", "是否准确")
 # PDF 限额独立于最终证据正文上限；超时由可终止的独立解析进程执行。
 PDF_MAX_BYTES = 10 * 1024 * 1024
 PDF_MAX_PAGES = 30
