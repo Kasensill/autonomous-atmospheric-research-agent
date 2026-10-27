@@ -43,7 +43,8 @@ from .state import (
 )
 from .tools import RESEARCH_TOOLS
 from .tools.clarification import ASK_USER_NAME, ASK_USER_TOOL
-from .evidence import usable_evidence, is_stale_weather
+from .evidence import usable_evidence, is_stale_weather, research_evidence, material_only_unverified, has_user_materials
+from .materials import coverage_text
 from .clock import BEIJING_TIMEZONE, parse_reference_time, reference_now, time_context
 
 
@@ -705,15 +706,22 @@ def record_results_node(state: ResearchState) -> dict[str, Any]:
 def research_guard_node(state: ResearchState) -> dict[str, Any]:
     """实施零证据保护、明确停研与无进展计次；无证据只能给出失败说明。"""
 
-    if state.get("research_stop_reason") and not usable_evidence(state):
+    if material_only_unverified(state) and (
+        state.get("research_stop_reason") or clarifications_exhausted(state) or research_budget_exhausted(state)
+    ):
+        return {"program_limitations": list(dict.fromkeys([
+            *state.get("program_limitations", []), "material_only_unverified",
+        ])), "trace": [{"node": "research_guard", "event": "material_only_unverified",
+                        "detail": "仅有未独立核实的线索材料；停止取证后进入受限范围评估，不作为独立证据放行。"}]}
+    if state.get("research_stop_reason") and not research_evidence(state):
         return {"trace": [{"node": "research_guard", "event": "research_stopped_without_evidence",
                            "detail": "模型明确停止取证且没有可用证据，进入失败说明，不消耗空研究轮次。"}]}
-    if clarifications_exhausted(state) and not usable_evidence(state):
+    if clarifications_exhausted(state) and not research_evidence(state):
         update = _clarification_limit_update(state, "research_guard")
         update["trace"].append({"node": "research_guard", "event": "clarification_limit_without_evidence",
                                 "detail": "澄清次数达到上限且没有可用证据，直接进入失败说明，不增加研究轮次。"})
         return update
-    if usable_evidence(state):
+    if research_evidence(state):
         messages = state.get("messages", [])
         latest_index = next((index for index in range(len(messages) - 1, -1, -1)
                              if isinstance(messages[index], AIMessage)), None)
@@ -770,7 +778,11 @@ def route_after_research_guard(
 ) -> Literal["assess_evidence", "agent", "finalize_limited_report"]:
     """确定守卫后的下一站：评估、继续研究或零证据受限结论。"""
 
-    if usable_evidence(state):
+    if research_evidence(state):
+        return "assess_evidence"
+    if material_only_unverified(state) and (
+        state.get("research_stop_reason") or clarifications_exhausted(state) or research_budget_exhausted(state)
+    ):
         return "assess_evidence"
     if state.get("research_stop_reason"):
         return "finalize_limited_report"
@@ -879,6 +891,11 @@ def assess_evidence_with_model(
 
     assessment: EvidenceAssessment = output.model_dump()
     normalization_trace = []
+    material_limit = material_only_unverified(state)
+    if material_limit:
+        assessment.update(sufficient=False, next_step="limited_report", clarification_question=None)
+        normalization_trace.append({"node": "assess_evidence", "event": "material_only_unverified",
+                                    "detail": "没有非材料的独立证据，程序限定为 limited_report。"})
     if output.next_step == "continue" and (research_budget_exhausted(state) or state.get("research_stop_reason")):
         assessment.update(sufficient=False, next_step="limited_report")
         normalization_trace.append({
@@ -887,14 +904,17 @@ def assess_evidence_with_model(
                       + "：模型 next_step=continue，规范化为 limited_report，sufficient=False。",
         })
     limit_update = {}
-    if output.next_step == "clarify" and clarifications_exhausted(state):
+    if output.next_step == "clarify" and clarifications_exhausted(state) and not material_limit:
         limit_update = _clarification_limit_update(state, "assess_evidence")
         assessment.update(sufficient=False, next_step="limited_report",
                           reason=f"{assessment['reason']} 澄清次数达到上限，基于已有证据形成受限报告。")
     return {
         **{k: v for k, v in limit_update.items() if k != "trace"},
+        **({"program_limitations": list(dict.fromkeys([
+            *state.get("program_limitations", []), "material_only_unverified",
+        ]))} if material_limit else {}),
         "assessment": assessment,
-        "clarification_question": output.clarification_question if output.next_step == "clarify" and not limit_update else None,
+        "clarification_question": output.clarification_question if assessment["next_step"] == "clarify" and not limit_update else None,
         "trace": [
             *normalization_trace,
             *limit_update.get("trace", []),
@@ -938,6 +958,8 @@ def route_after_evidence_assessment(
 def _report_mode(state: ResearchState) -> Literal["full", "limited"]:
     """根据评估结果决定报告类型；程序不把“证据不足”包装成完整结论。"""
 
+    if material_only_unverified(state):
+        return "limited"
     assessment = state.get("assessment", {})
     if assessment.get("sufficient") and assessment.get("next_step") == "full_report":
         return "full"
@@ -968,6 +990,10 @@ def _reference_section(numbered_evidence: list[dict[str, Any]], *, report: str |
     seen_sources: set[tuple[str, str]] = set()
     for evidence in numbered_evidence:
         display_name = _plain_reference_text(evidence.get("source_display_name", "未标注来源"))
+        if evidence.get("source_type") == "user_material":
+            locator = _plain_reference_text(evidence.get("locator", "未记录定位"))
+            lines.append(f"- [{evidence['citation_id']}] 用户提供：{display_name}（{locator}；未独立核实）")
+            continue
         location = _reference_url(evidence.get("source_location", ""))
         source_key = (evidence['citation_id'], location)
         if source_key in seen_sources:
@@ -1302,6 +1328,9 @@ def generate_draft_with_model(state: ResearchState, model: Any) -> dict[str, Any
     return {
         "draft_report": draft_report,
         "report_mode": mode,
+        **({"program_limitations": list(dict.fromkeys([
+            *state.get("program_limitations", []), "material_only_unverified",
+        ]))} if material_only_unverified(state) else {}),
         "trace": [
             {
                 "node": "generate_draft",
@@ -1399,13 +1428,21 @@ def finalize_report_node(state: ResearchState) -> dict[str, Any]:
     if not review or review.get("verdict") != "pass":
         raise ValueError("finalize_report 只能定稿 verdict=pass 的报告。")
     final_report = f"{draft_report.strip()}\n\n{_reference_section(_numbered_evidence(state), report=draft_report)}"
-    if state.get("report_mode", _report_mode(state)) == "limited":
+    mode = "limited" if material_only_unverified(state) else state.get("report_mode", _report_mode(state))
+    if state.get("materials"):
+        final_report += "\n\n" + coverage_text(state["materials"])
+    if material_only_unverified(state):
+        final_report = "> 所依据的仅有用户提供、未独立核实的材料；不能据此确认外部事实。\n\n" + final_report
+    if mode == "limited":
         final_report = (
             "> 受限报告：当前证据不全，本报告仅包含被证据支持的部分；未解决问题见正文。\n\n"
             + final_report
         )
     return {
         "final_report": final_report,
+        **({"report_mode": mode, "program_limitations": list(dict.fromkeys([
+            *state.get("program_limitations", []), "material_only_unverified",
+        ]))} if material_only_unverified(state) else {}),
         "trace": [
             {
                 "node": "finalize_report",
@@ -1426,6 +1463,9 @@ def store_memory_node(state: ResearchState) -> dict[str, list[TraceEntry]]:
     if not review or review.get("verdict") != "pass":
         raise ValueError("store_memory 只能保存已通过 Verification 的报告。")
 
+    if has_user_materials(state):
+        return {"trace": [{"node": "store_memory", "event": "memory_skipped",
+                           "detail": "含用户材料，本次运行不写入长期记忆。"}]}
     mode = state.get("report_mode")
     if mode != "full":
         reason = ("受限报告证据不全，不写入长期记忆" if mode == "limited"

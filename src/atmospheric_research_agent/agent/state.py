@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from operator import add
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from typing_extensions import TypedDict
@@ -47,7 +47,12 @@ class EvidenceRecord(TypedDict, total=False):
     # 可追溯的原始位置：本地 Markdown 相对路径、URL 或天气地点标识。
     source_location: str
     # 来源属于内部知识库、当前天气结果还是公开网页；影响后续解释与引用边界。
-    source_type: Literal["local_knowledge", "weather", "web"]
+    source_type: Literal["local_knowledge", "weather", "web", "user_material"]
+    # 用户材料只证明原文的说法；这些元数据不赋予独立事实证明资格。
+    material_id: str
+    locator: str
+    verification_status: Literal["user_provided_unverified"]
+    role: Literal["clue", "analysis", "both"]
     # 哪个 Tool 产出了这条证据，便于 Trace、调试和来源审计。
     tool_name: str
     # 网页作者、机构，或天气数据提供机构；工具能获得时才填写。
@@ -205,8 +210,12 @@ class ResearchState(TypedDict, total=False):
     # 本次可引用的正式资料。
     recalled_memories: list[ProjectMemoryRecord]
 
-    # record_results 节点从工具结果中整理出的正式证据；只有这里的内容才能支持报告引用。
+    # 工具结果与入口材料的可引用记录；材料引用只证明原文，不自动证明外部事实。
     evidence: Annotated[list[EvidenceRecord], add]
+
+    # 本任务的材料解析/送入覆盖摘要，不含加载路径；覆盖更新，不追加。
+    materials: list[dict[str, Any]]
+    material_role: Literal["clue", "analysis", "both"]
 
     # 已执行过几批工具调用；用于限制 Agent Loop，避免无限研究。
     research_round: int

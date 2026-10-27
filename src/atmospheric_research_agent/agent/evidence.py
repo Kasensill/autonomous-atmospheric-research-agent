@@ -26,3 +26,22 @@ def is_stale_weather(record: dict, *, now: datetime | None = None) -> bool:
 def usable_evidence(state: dict, *, now: datetime | None = None) -> list[dict]:
     current = now if now is not None else reference_now(state)
     return [record for record in state.get("evidence", []) if not is_stale_weather(record, now=current)]
+
+
+def research_evidence(state: dict) -> list[dict]:
+    """用于研究守卫的证据：文本分析材料可用，线索材料不冒充独立证据。"""
+    return [record for record in usable_evidence(state)
+            if record.get("source_type") != "user_material" or record.get("role") == "analysis"]
+
+
+def material_only_unverified(state: dict) -> bool:
+    records = usable_evidence(state)
+    return (any(record.get("source_type") == "user_material" and record.get("role") in {"clue", "both"}
+                for record in records)
+            and not any(record.get("source_type") != "user_material" for record in records))
+
+
+def has_user_materials(state: dict) -> bool:
+    return bool(state.get("materials")) or any(
+        record.get("source_type") == "user_material" for record in state.get("evidence", [])
+    )

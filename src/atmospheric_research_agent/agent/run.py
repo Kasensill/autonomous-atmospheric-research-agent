@@ -146,6 +146,9 @@ def _save_debug_materials(graph: Any, config: dict, result: ResearchState, direc
         for index, record in enumerate(result.get("evidence", []), start=1)
     ]
     files["evidence.json"] = json.dumps(evidence, ensure_ascii=False, indent=2)
+    if "materials" in result:
+        files["materials.json"] = json.dumps({"role": result.get("material_role"),
+                                               "materials": result["materials"]}, ensure_ascii=False, indent=2)
     files["final_report.md"] = result.get("final_report") or ""
     files["final_output.txt"] = format_final_result(result, debug=True) + "\n"
     # debug 入口已创建目录并实时写入节点记录，这里只补充结束材料。
@@ -157,12 +160,23 @@ def _save_debug_materials(graph: Any, config: dict, result: ResearchState, direc
 def run_research(
     question: str, *, answer_provider: Callable[[str], str] | None = None, debug: bool = False,
     reference_time: str | None = None,
+    material_paths: list[str | Path] | None = None, material_role: str = "auto",
 ) -> ResearchState:
     """同进程运行与恢复；没有回答接收器时将暂停结果返回给调用者。"""
 
     graph = build_research_graph(checkpointer=InMemorySaver())
     initial_state = (create_initial_state(question, reference_time=reference_time)
                      if reference_time is not None else create_initial_state(question))
+    if material_paths:
+        from .materials import load_materials
+        loaded = load_materials(material_paths, question, material_role)
+        initial_state["evidence"] = loaded["evidence"]
+        initial_state["materials"] = loaded["materials"]
+        initial_state["material_role"] = loaded["material_role"]
+        initial_state["trace"].extend(loaded["trace"])
+        for event in loaded["trace"]:
+            if event["event"] == "material_skipped":
+                print(f"材料提示：{event['detail']}")
     debug_directory = None
     live_trace = None
     if debug:
@@ -171,6 +185,12 @@ def run_research(
         debug_directory = PROJECT_ROOT / "docs" / "validation" / datetime.now().astimezone().date().isoformat() / run_id
         _check_debug_directory_ignored(debug_directory)
         debug_directory.mkdir(parents=True, exist_ok=False)
+        if "materials" in initial_state:
+            # 解析摘要先落盘，暂停或超限也可检查；不保存原始文件路径。
+            (debug_directory / "materials.json").write_text(json.dumps({
+                "role": initial_state.get("material_role"), "materials": initial_state["materials"],
+                "trace": [e for e in initial_state["trace"] if e["node"] == "material_loader"],
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
         live_trace = _LiveNodeTrace(debug_directory)
     started = perf_counter()
     config = {"recursion_limit": GRAPH_RECURSION_LIMIT,
@@ -302,6 +322,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="运行一次大气科学 Autonomous Research Agent。")
     parser.add_argument("question", help="需要研究的大气科学问题。")
     parser.add_argument("--debug", action="store_true", help="额外显示研究轮次、工具数和运行轨迹。")
+    parser.add_argument("--material", action="append", default=[], metavar="PATH", help="本地 TXT、MD 或文字型 PDF 材料，可重复。")
+    parser.add_argument("--material-role", choices=("auto", "clue", "analysis", "both"), default="auto", help="本任务如何使用材料，默认 auto。")
     arguments = parser.parse_args()
 
     def read_answer(question: str) -> str:
@@ -309,7 +331,9 @@ def main() -> None:
         return input("你的回答：")
 
     try:
-        result = run_research(arguments.question, answer_provider=read_answer, debug=arguments.debug)
+        material_options = ({"material_paths": arguments.material, "material_role": arguments.material_role}
+                            if arguments.material else {})
+        result = run_research(arguments.question, answer_provider=read_answer, debug=arguments.debug, **material_options)
     except GraphRecursionError as error:
         print("\n流程超过步数上限被中止，本次未完成报告。这是流程保护中止，不是系统崩溃。")
         for note in getattr(error, "__notes__", []):
