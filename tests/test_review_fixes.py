@@ -139,10 +139,34 @@ def test_writing_revision_and_review_preserve_causality_and_advice_scope():
 
 
 def test_knowledge_does_not_make_low_level_jet_a_universal_requirement():
-    path = Path(__file__).resolve().parents[1] / "data/knowledge_base/03_大气动力学与环流/23_低空急流与强降水.md"
-    text = path.read_text(encoding="utf-8")
-    assert "并非所有暴雨的普遍必要条件" in text
-    assert "为暴雨提供必要环境条件之一" not in text
+    from atmospheric_research_agent.ingestion.build_index import split_markdown_file
+
+    root = Path(__file__).resolve().parents[1] / "data/knowledge_base"
+    chunks = split_markdown_file(root / "03_大气动力学与环流/23_低空急流与强降水.md", root)
+    assert chunks
+    for chunk in chunks:
+        # 现在是北美研究原文：安全边界由来源范围传给模型，不能要求原作者写旧中文摘要。
+        scope = chunk.metadata["source_scope"]
+        assert chunk.metadata["content_kind"] == "general_mechanism"
+        assert "不是东亚暴雨的直接观测证明" in scope
+        assert "区域阈值不能普遍化" in scope
+        assert "不能推出低空急流是所有暴雨必要或充分条件" in scope
+        assert scope in chunk.text
+        assert "为暴雨提供必要环境条件之一" not in chunk.text
+
+    from langchain_core.messages import ToolMessage
+    from atmospheric_research_agent.agent.tools.local_knowledge import _source_from_metadata
+
+    chunk = chunks[0]
+    source = _source_from_metadata(chunk.metadata)
+    evidence = nodes._evidence_from_local_knowledge(
+        ToolMessage(content="", name="search_local_knowledge", tool_call_id="offline"),
+        {"status": "success", "results": [{"content": chunk.text, "source": source}]},
+    )
+    assert evidence[0]["source_scope"] == chunk.metadata["source_scope"]
+    state = create_initial_state("850 hPa 低空急流与暴雨有什么关系？")
+    state["evidence"] = evidence
+    assert scope in nodes._assessment_messages(state)[1].content
 
 
 @pytest.mark.parametrize("method", ["invoke", "stream", "ainvoke", "astream"])

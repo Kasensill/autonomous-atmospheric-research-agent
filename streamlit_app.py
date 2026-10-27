@@ -1,15 +1,13 @@
 """启动：python -m streamlit run streamlit_app.py --server.address 127.0.0.1"""
 
-import os
-from pathlib import Path
+from uuid import uuid4
 
 import streamlit as st
-from dotenv import load_dotenv
 
 from atmospheric_research_agent.agent.settings import (
     MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS,
 )
-from atmospheric_research_agent.ui.session import ResearchSession
+from atmospheric_research_agent.ui.client import ApiError, RemoteResearchTask, ResearchClient
 
 
 NODE_LABELS = {
@@ -26,7 +24,7 @@ NODE_LABELS = {
 def reset_task() -> None:
     """按钮回调在页面重绘前清理界面输入，不删除磁盘材料或长期记忆。"""
     for key in list(st.session_state):
-        if key in {"research_task", "question_draft", "confirm_new_task"} or key.startswith(
+        if key in {"research_task", "question_draft", "confirm_new_task", "create_request"} or key.startswith(
             ("active_question_", "clarification_answer_")
         ):
             del st.session_state[key]
@@ -34,7 +32,7 @@ def reset_task() -> None:
 
 def request_new_task() -> None:
     task = st.session_state.get("research_task")
-    if task is not None and task.status not in {"completed", "failed"}:
+    if task is not None and task.status not in {"completed", "failed", "abandoned"}:
         st.session_state["confirm_new_task"] = True
     else:
         reset_task()
@@ -52,7 +50,7 @@ def render_progress(state: dict, activity, counters) -> None:
     )
 
 
-def render_results(task: ResearchSession) -> None:
+def render_results(task: RemoteResearchTask) -> None:
     state = task.state
     a, b, c, d = st.columns(4)
     a.metric("交付状态", task.ending)
@@ -75,7 +73,9 @@ def render_results(task: ResearchSession) -> None:
                                file_name=f"research_{state['run_id']}.md", mime="text/markdown")
         elif task.status == "failed":
             st.error(task.error)
-            st.info("已保留本会话可读取的证据和轨迹。不自动重试，避免重复请求；可下载后新建任务。")
+            st.info("已保留可查询的进度与轨迹。不自动重试，避免重复请求；可新建任务。")
+        elif task.status == "abandoned":
+            st.info("任务已放弃，没有生成报告。")
         else:
             st.info("研究尚未结束。补充条件后继续同一任务，草稿不会作为最终报告交付。")
     with evidence:
@@ -89,9 +89,11 @@ def render_results(task: ResearchSession) -> None:
                 st.caption(f"有效时间：{record.get('valid_at') or '未提供／不适用'}")
                 st.text(record.get("content", ""))
         if not state.get("evidence"):
-            st.caption("尚未取得正式证据。搜索候选不在这里冒充证据。")
+            st.caption("没有可展示的正式证据。" if task.status == "completed"
+                       else "证据正文在任务完成后提供；目前可查询进度和 Trace。")
         st.download_button("下载原始证据 JSON", task.export_json("evidence"),
-                           file_name=f"evidence_{state['run_id']}.json", mime="application/json")
+                           file_name=f"evidence_{state['run_id']}.json", mime="application/json",
+                           disabled=task.status != "completed")
     # 放在结果页底部，不依赖当前选择哪个报告／证据页签。
     st.divider()
     st.subheader("本次研究记录")
@@ -99,7 +101,8 @@ def render_results(task: ResearchSession) -> None:
         st.write("研究问题：", state["question"])
         history = state.get("clarification_history", [])
         if not history:
-            st.caption("本次没有已完成的追问。")
+            st.caption("本次没有已完成的追问。" if task.status == "completed"
+                       else f"已有 {task.view['clarification_count']} 次补充；详细问答记录在任务完成后提供。")
         for index, item in enumerate(history, 1):
             st.markdown(f"**补充条件 {index}**")
             st.write("追问：", item.get("question", ""))
@@ -125,15 +128,58 @@ def render_results(task: ResearchSession) -> None:
     st.caption(f"任务编号：{state['run_id']}")
 
 
+def abandon_and_reset() -> None:
+    task = st.session_state.get("research_task")
+    try:
+        if task is not None and task.status == "waiting":
+            task.client.abandon(task.state["run_id"])
+        reset_task()
+    except ApiError as error:
+        st.session_state["api_error"] = str(error)
+
+
+@st.fragment(run_every="2s")
+def poll_task(task: RemoteResearchTask) -> None:
+    try:
+        if task.refresh():
+            st.rerun()
+        st.caption("正在查询服务端进度；关闭页面不会主动取消研究。")
+    except ApiError as error:
+        st.warning(str(error))
+
+
 def main() -> None:
     st.set_page_config(page_title="大气研究工作台", page_icon="🌤️", layout="wide")
-    load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
     st.markdown("""<style>
         .block-container {max-width: 1240px; padding-top: 2.3rem;}
         [data-testid="stMetric"] {border: 1px solid #b7c9dd55; border-radius: 12px; padding: 16px;}
         [data-testid="stSidebar"] {border-right: 1px solid #b7c9dd33;}
         </style>""", unsafe_allow_html=True)
+    if "api_client" not in st.session_state:
+        try:
+            st.session_state["api_client"] = ResearchClient()
+        except ApiError as error:
+            st.error(str(error))
+            return
+    client = st.session_state["api_client"]
+    service_ok = False
+    runs = []
+    try:
+        client.health()
+        runs = client.list_runs()
+        service_ok = True
+    except ApiError as error:
+        st.warning(str(error))
+        st.code(".venv\\Scripts\\python -m atmospheric_research_agent.service", language="powershell")
     task = st.session_state.get("research_task")
+    if task is not None and service_ok:
+        try:
+            task.refresh()
+        except ApiError as error:
+            st.warning(str(error))
+            if error.code == "run_not_found":
+                st.session_state.pop("research_task", None)
+                task = None
     with st.sidebar:
         st.markdown("### 🌤️ 大气研究工作台")
         st.caption("证据驱动 · 有限研究 · 可追溯交付")
@@ -141,25 +187,29 @@ def main() -> None:
                   disabled=task is not None and task.status == "running",
                   on_click=request_new_task)
         if st.session_state.get("confirm_new_task"):
-            st.warning("新建会放弃当前未完成任务，无法从本页面继续；已用 API 费用不会退回。")
+            st.warning("确认后将放弃等待中的任务；已用 API 费用不会退回。")
             confirm, cancel = st.columns(2)
-            confirm.button("确认新建", on_click=reset_task, use_container_width=True)
+            confirm.button("确认新建", on_click=abandon_and_reset, use_container_width=True)
             cancel.button("继续当前任务", on_click=lambda: st.session_state.pop("confirm_new_task", None),
                           use_container_width=True)
         st.divider()
-        st.markdown("**连接配置**")
-        for name, label in [("DEEPSEEK_API_KEY", "研究模型"),
-                            ("DASHSCOPE_API_KEY", "向量检索与重排"),
-                            ("TAVILY_API_KEY", "网页搜索")]:
-            st.caption(f"{'● 已配置' if os.getenv(name) else '○ 未配置'} · {label}")
-        st.caption("这里只检查配置是否存在，不代表凭据或服务已验证。密钥在本地 .env 配置。")
+        st.caption("研究服务：" + ("已连接" if service_ok else "未连接"))
+        st.caption(client.base_url)
+        st.button("刷新服务状态", on_click=lambda: None)
+        st.markdown("**服务端任务**")
+        for view in runs:
+            label = " ".join(view["question"].split())[:25]
+            if st.button(f"{view['status']} · {label}", key=f"open_{view['run_id']}"):
+                st.session_state["research_task"] = RemoteResearchTask(client, view)
+                st.session_state.pop("confirm_new_task", None)
+                st.rerun()
         st.divider()
         st.markdown("**程序预算**")
         st.caption(f"研究 {MAX_RESEARCH_ROUNDS} 轮 · 工具 {MAX_TOOL_CALLS} 次 · 追问 {MAX_CLARIFICATIONS} 次")
-        st.caption("由现有研究图控制，界面不修改预算。")
-        st.divider()
-        st.caption("本地单人工作台。刷新、断线或重启可能丢失会话，请及时下载。图状态按会话隔离；长期项目记忆仍复用本地存储，不提供多用户隔离。")
-
+        st.caption("由现有研究图控制，界面不修改预算。凭据在服务端本地 .env 配置。")
+        st.caption("本地单人服务，一次一个未结束任务。页面可重新选择任务；服务重启后内存任务丢失。仅保留有限历史，不支持运行中强制取消。")
+    if st.session_state.get("api_error"):
+        st.error(st.session_state.pop("api_error"))
     if task is None:
         st.title("把问题，交给证据。")
     else:
@@ -167,65 +217,55 @@ def main() -> None:
         title_question = title_question[:90] + "…" if len(title_question) > 90 else title_question
         st.title(f"当前问题：{title_question}")
     st.write("提出大气科学问题，查看取证过程，获得带来源的研究报告。")
-    st.caption("可研究一般机制或具体事件；缺少关键条件时会暂停追问，证据不足时受限交付或说明失败。")
-    submitted = False
-    question = ""
+    st.caption("缺少关键条件时暂停追问，证据不足时受限交付或说明失败。")
     if task is None:
         with st.form("research_question"):
-            question = st.text_area("研究问题", height=135, key="question_draft",
+            question = st.text_area("研究问题", height=135, key="question_draft", max_chars=10000,
                                     placeholder="例如：为什么副热带高压主体常晴热少雨，边缘也一样吗？")
-            submitted = st.form_submit_button("开始研究", type="primary")
-            st.caption("开始后会调用已配置的模型和工具，可能产生 API 费用。本版支持文本问题和公开链接，不支持文件上传。")
-    else:
-        # 任务的原始问题是唯一数据来源，不依赖编辑控件在重绘时的默认值。
-        st.text_area("研究问题", value=task.state["question"], height=135,
-                     key=f"active_question_{task.state['run_id']}", disabled=True)
-
-    execute = task is not None and task.status == "ready"
-    answer = None
-    if submitted:
-        if not question.strip():
-            st.warning("请填写研究问题。")
-        elif not os.getenv("DEEPSEEK_API_KEY"):
-            st.error("尚未配置 DEEPSEEK_API_KEY，请先在本地 .env 中配置研究模型。")
-        else:
-            task = ResearchSession(question)
-            st.session_state["research_task"] = task
-            # 先重绘为当前任务标题与只读原问题，再开始运行。
-            st.rerun()
-
-    if task is None:
+            submitted = st.form_submit_button("开始研究", type="primary", disabled=not service_ok)
+            st.caption("开始后服务端会调用已配置的模型和工具，可能产生 API 费用。本版不支持文件上传。")
+        if submitted:
+            if not question.strip():
+                st.warning("请填写研究问题。")
+            else:
+                pending = st.session_state.get("create_request")
+                if not pending or pending["question"] != question.strip():
+                    pending = {"question":question.strip(), "key":str(uuid4())}
+                    st.session_state["create_request"] = pending
+                try:
+                    view = client.create(pending["question"], pending["key"])
+                    st.session_state["research_task"] = RemoteResearchTask(client, view)
+                    st.rerun()
+                except ApiError as error:
+                    st.error(str(error))
         st.divider()
-        left, middle, right = st.columns(3)
-        left.markdown("**01 · 先取证**\n\n搜索摘要只是候选，读取与整理后的内容才成为正式证据。")
-        middle.markdown("**02 · 再核验**\n\n报告先起草再核验，有必须修改项时受控修订。")
-        right.markdown("**03 · 如实交付**\n\n区分完整报告、受限报告和失败说明，并保留运行轨迹。")
+        st.caption("先取证 → 评估 → 起草 → 核验；报告、证据和运行记录在同一任务内查看。")
         return
-
+    st.text_area("研究问题", value=task.state["question"], height=135,
+                 key=f"active_question_{task.state['run_id']}", disabled=True)
+    if task.status == "running":
+        st.info("服务端正在研究。")
+        render_progress(task.state, st.empty(), st.empty())
+        poll_task(task)
     if task.status == "waiting":
         st.warning("研究已暂停，等待你补充信息。已有证据和已用预算保留。")
         st.write(task.question)
-        history_count = len(task.state.get("clarification_history", []))
-        st.caption(f"补充条件 · 第 {history_count + 1} 次")
-        with st.form(f"clarify_{task.state['run_id']}_{history_count}"):
-            # 每轮独立 key：下一次追问为空；本轮空回答／未成功接收则保留原输入。
-            answer = st.text_area("你的补充", key=f"clarification_answer_{task.state['run_id']}_{history_count}",
+        question_id = task.view["clarification"]["question_id"]
+        with st.form(f"clarify_{question_id}"):
+            answer = st.text_area("你的补充", key=f"clarification_answer_{question_id}", max_chars=10000,
                                   placeholder="请回答上面的问题，例如地点、日期或研究对象。")
-            resume = st.form_submit_button("提交回答，继续原任务", type="primary")
+            resume = st.form_submit_button("提交回答，继续原任务", type="primary", disabled=not service_ok)
         if resume:
             if not answer.strip():
                 st.warning("回答不能为空；原任务仍在等待。")
             else:
-                execute = True
-
-    if execute:
-        activity = st.empty()
-        counters = st.empty()
-        with st.status("正在研究，请等待节点完成…", expanded=True) as status:
-            task.advance(answer, on_progress=lambda state: render_progress(state, activity, counters))
-            status.update(label=task.ending, state="error" if task.status == "failed" else "complete")
-        st.rerun()
-
+                try:
+                    task.answer(answer)
+                    st.rerun()
+                except ApiError as error:
+                    st.error(str(error))
+    if task.status == "abandoned":
+        st.info("该任务已放弃，可新建研究。")
     render_results(task)
 
 

@@ -2,37 +2,74 @@
   {
     "id": "subtropical_high_semantic_mechanism",
     "irrelevant_sources": [
-      {"location":"06_气候系统与气候变化/39_ENSO.md","section":"定义与背景"},
-      {"location":"05_热带天气系统/35_马登_朱利安振荡.md","section":"定义与背景"}
+      {
+        "location": "06_气候系统与气候变化/39_ENSO.md",
+        "section": "定义与背景"
+      },
+      {
+        "location": "05_热带天气系统/35_马登_朱利安振荡.md",
+        "section": "定义与背景"
+      }
     ],
     "question": "为什么副热带高压控制期间天气常表现为晴热少雨？",
     "category": "semantic_paraphrase",
     "expected_sources": [
-      {"location": "03_大气动力学与环流/22_副热带高压及其天气影响.md", "section": "形成机制"},
-      {"location": "03_大气动力学与环流/22_副热带高压及其天气影响.md", "section": "影响与表现"}
+      {
+        "location": "03_大气动力学与环流/22_副热带高压及其天气影响.md",
+        "section": "原文 > PDF第 62 页",
+        "supporting_text": "a descending current of air (subsidence)"
+      },
+      {
+        "location": "04_天气系统与中高纬过程/25_高压_低压与地面天气图.md",
+        "section": "形成机制",
+        "supporting_text": "下沉运动常与高压和云量减少相关"
+      },
+      {
+        "location": "04_天气系统与中高纬过程/30_高温过程与热浪.md",
+        "section": "形成机制",
+        "supporting_text": "持续下沉增温、晴空辐射"
+      }
     ],
-    "note": "问题未直接复用资料标题；需要同时召回副高的环流背景和其对云雨、晴热的影响。"
+    "note": "2026-10-27按当前语料迁移：教材第62页支持环流下沉背景；保留的高低压与热浪条目分别支持云雨抑制和晴热机制，不把只谈环流位置的页当完整天气解释。",
+    "annotation_revision": "2026-10-27"
   },
   {
     "id": "high_pressure_boundary",
     "question": "高压系统一出现，就一定意味着高温干旱吗？",
     "category": "boundary_condition",
     "expected_sources": [
-      {"location": "03_大气动力学与环流/22_副热带高压及其天气影响.md", "section": "适用条件与局限性"},
-      {"location": "04_天气系统与中高纬过程/25_高压_低压与地面天气图.md", "section": "适用条件与局限性"}
+      {
+        "location": "04_天气系统与中高纬过程/25_高压_低压与地面天气图.md",
+        "section": "适用条件与局限性",
+        "supporting_text": "高低压描述的是形势，不是天气保证"
+      }
     ],
-    "note": "评测结论边界类问题，相关资料应明确说明高压不是天气保证。"
+    "note": "2026-10-27按当前语料迁移：原副高适用条件小节已被原文替换；用仍明确说明季节、湿度、地形限制的高低压小节作为正标签，不把资料说明当科学证据。",
+    "annotation_revision": "2026-10-27"
   },
   {
     "id": "low_level_jet_heavy_rain",
     "question": "850 hPa 低空急流与暴雨有什么关系？",
     "category": "exact_term_and_multimechanism",
     "expected_sources": [
-      {"location": "03_大气动力学与环流/23_低空急流与强降水.md", "section": "形成机制"},
-      {"location": "03_大气动力学与环流/23_低空急流与强降水.md", "section": "影响与表现"},
-      {"location": "03_大气动力学与环流/23_低空急流与强降水.md", "section": "适用条件与局限性"}
+      {
+        "location": "03_大气动力学与环流/23_低空急流与强降水.md",
+        "section": "原文 > PDF第 1 页",
+        "supporting_text": "they can transfer abundant water vapor to the downwind regions"
+      },
+      {
+        "location": "07_典型气象灾害/42_暴雨与短时强降水.md",
+        "section": "形成机制",
+        "supporting_text": "充足水汽、持续抬升"
+      },
+      {
+        "location": "09_诊断方法与规范/02_水汽输送与来源诊断清单.md",
+        "section": "输送的基本资料",
+        "supporting_text": "850 hPa 是常见分析层，不是所有过程固定唯一的输送层"
+      }
     ],
-    "note": "新增专题资料后，系统应能召回 850 hPa 诊断、水汽输送/抬升路径与非充分条件的边界说明。"
+    "note": "2026-10-27按当前语料迁移：北美研究第1页支持输送和有利动力条件，暴雨条目补充环境条件，项目清单限定850hPa诊断层；北美模拟不是东亚实测或通用暴雨阈值。",
+    "annotation_revision": "2026-10-27"
   },
   {
     "id": "heavy_rain_ingredients",
