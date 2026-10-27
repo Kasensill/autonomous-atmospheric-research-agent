@@ -74,6 +74,9 @@ MATERIAL_MAX_FILES = 3
 MATERIAL_MAX_CHARS_TOTAL = 20_000
 # 文本替换字符或异常控制字符比例超过此值时拒绝，避免把乱码送入模型；可调。
 MATERIAL_MAX_GARBLED_RATIO = 0.02
+# 材料块边界；加载时对正文中的同名标记等长转义，不能充当指令或闭合边界。
+MATERIAL_BEGIN = "<USER_MATERIAL_DATA>"
+MATERIAL_END = "</USER_MATERIAL_DATA>"
 # auto 角色判定词表，可调；仅用于选择材料用途，不判断内容真假。
 MATERIAL_REFERENCE_WORDS = ("这份", "该份", "此份", "附件", "上传的", "材料", "文件", "文档", "报告", "论文")
 MATERIAL_TEXT_TASK_WORDS = ("总结", "概括", "摘要", "提炼", "梳理", "分析论证", "检查论证", "比较", "对比", "翻译", "解读")

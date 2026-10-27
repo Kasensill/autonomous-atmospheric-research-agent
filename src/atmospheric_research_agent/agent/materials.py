@@ -8,13 +8,9 @@ import unicodedata
 from .settings import (
     MATERIAL_MAX_FILES, MATERIAL_MAX_CHARS_TOTAL, MATERIAL_MAX_GARBLED_RATIO,
     MATERIAL_REFERENCE_WORDS, MATERIAL_TEXT_TASK_WORDS, MATERIAL_VERIFICATION_WORDS,
-    MAX_SOURCE_CHARACTERS,
+    MAX_SOURCE_CHARACTERS, MATERIAL_BEGIN, MATERIAL_END,
 )
 from .tools.pdf_reader import read_pdf_text
-
-
-MATERIAL_BEGIN = "<USER_MATERIAL_DATA>"
-MATERIAL_END = "</USER_MATERIAL_DATA>"
 
 
 def escape_material_markers(text: str) -> str:
@@ -52,12 +48,12 @@ def _text_error(text: str) -> str | None:
 
 def _pieces(text: str, pdf: bool) -> list[tuple[str, str, int | None]]:
     if pdf:
-        return [(match[0], f"第 {match[1]} 页", int(match[1])) for match in re.findall(
-            r"(\[第 (\d+) 页\]\n[\s\S]*?)(?=\n\n\[第 \d+ 页\]\n|\Z)", text
-        )]
+        markers = list(re.finditer(r"(?m)^\[第 (\d+) 页\]\n", text))
+        return [(text[marker.start():markers[index + 1].start() if index + 1 < len(markers) else len(text)],
+                 f"第 {marker[1]} 页", int(marker[1])) for index, marker in enumerate(markers)]
     # 保留分段分隔符；定位按非空段落计，长段落再按证据正文上限切片。
     return [(match.group(), f"第 {index} 段", None) for index, match in enumerate(
-        (m for m in re.finditer(r"[\s\S]+?(?:\n[ \t]*\n|\Z)", text) if m.group().strip()), 1
+        (m for m in re.finditer(r"[\s\S]+?(?:\r?\n[ \t]*\r?\n|\Z)", text) if m.group().strip()), 1
     )]
 
 
