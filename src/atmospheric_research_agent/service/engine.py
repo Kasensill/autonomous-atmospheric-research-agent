@@ -22,7 +22,8 @@ class ResearchSession:
 
     def __init__(self, question: str, *, run_id: str | None = None,
                  on_error: Callable[[Exception], None] | None = None,
-                 material_paths: list[str | Path] | None = None, material_role: str = 'auto') -> None:
+                 material_paths: list[str | Path] | None = None, material_role: str = 'auto',
+                 material_snapshot: dict | None = None, conversation_context: list | None = None) -> None:
         self.state: dict[str, Any] = dict(create_initial_state(question))
         if run_id is not None:
             self.state["run_id"] = run_id
@@ -32,6 +33,22 @@ class ResearchSession:
             for key in ('evidence', 'materials', 'material_role'):
                 self.state[key] = loaded[key]
             self.state['trace'].extend(loaded['trace'])
+        if material_snapshot is not None:
+            from copy import deepcopy
+            from ..agent.materials import decide_material_role
+            role, reason = decide_material_role(question, material_role)
+            self.state['materials'] = deepcopy(material_snapshot.get('materials', []))
+            self.state['evidence'] = deepcopy(material_snapshot.get('evidence', []))
+            self.state['material_role'] = role
+            for item in self.state['evidence']:
+                item['role'] = role
+            self.state['trace'].append({'node': 'conversation', 'event': 'material_role_decided',
+                'detail': f'复用已解析材料；本轮角色：{role}；{reason}', 'role': role})
+        if conversation_context:
+            self.state['conversation_context'] = conversation_context
+            self.state['trace'].append({'node': 'conversation', 'event': 'conversation_context_loaded',
+                'detail': '历史仅作背景，不继承旧证据、旧引用或已用预算。',
+                'turn_count': len(conversation_context)})
         self.on_error = on_error
         self.checkpointer = InMemorySaver()
         self.graph = build_research_graph(checkpointer=self.checkpointer)

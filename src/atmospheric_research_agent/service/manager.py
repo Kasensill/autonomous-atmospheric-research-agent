@@ -22,7 +22,7 @@ PUBLIC_FIELDS = frozenset({
     'research_round', 'tool_call_count', 'clarification_history', 'evidence',
     'report_review', 'report_revision_count', 'report_mode', 'final_report',
     'program_limitations',
-    'materials', 'material_role',
+    'materials', 'material_role', 'conversation_context',
 })
 
 
@@ -60,7 +60,10 @@ class RunRecord:
     material_names: list[str] = field(default_factory=list)
     material_role: str | None = None
     material_fingerprint: str | None = None
-
+    conversation_id: str = ""
+    parent_run_id: str | None = None
+    conversation_context: list = field(default_factory=list)
+    material_snapshot: dict | None = None
 
 
 class RunManager:
@@ -96,6 +99,7 @@ class RunManager:
     def _view(self, record: RunRecord) -> dict:
         return deepcopy({
             'run_id':record.run_id,'question':record.question,'status':record.status,
+            'conversation_id':record.conversation_id or record.run_id, 'parent_run_id':record.parent_run_id,
             'delivery_type':record.delivery_type,'version':record.version,'updated_at':record.updated_at,
             'clarification':record.clarification,'error':record.error,'elapsed_ms':record.elapsed_ms,
             'research_round':record.state.get('research_round',0),
@@ -130,7 +134,7 @@ class RunManager:
             self._keys.pop(victim.key,None)
 
     def create(self, question: str, key: str, *, materials: list[MaterialUpload] | None = None,
-               material_role: str = 'auto') -> dict:
+               material_role: str = 'auto', parent_run_id: str | None = None) -> dict:
         question = question.strip()
         if not question or len(question)>10000 or not key or len(key)>128:
             raise ServiceError(422,'invalid_request','问题或请求标识无效。')
@@ -144,13 +148,47 @@ class RunManager:
             self._ensure_open()
             if key in self._keys:
                 record=self._record(self._keys[key])
-                if record.question != question or record.material_fingerprint != fingerprint:
+                if (record.question != question or record.material_fingerprint != fingerprint
+                        or record.parent_run_id != parent_run_id
+                        or (parent_run_id and record.material_role != material_role)):
                     raise ServiceError(409,'idempotency_conflict','同一请求标识不能用于不同问题、材料或材料用途。',record.run_id)
                 return self._view(record)
             if self._active is not None:
                 raise ServiceError(409,'task_busy','请先完成或放弃当前等待中的任务。',self._active)
-            self._prune()
+            parent = self._record(parent_run_id) if parent_run_id else None
+            if parent and parent.status != 'completed':
+                raise ServiceError(409, 'parent_not_completed', '只有已完成任务可以继续提问；澄清请回答原任务。', parent_run_id)
+            if parent and materials:
+                raise ServiceError(422, 'invalid_request', '继续提问复用原材料；更换材料请新建研究。')
             record=RunRecord(str(uuid4()),question,key)
+            record.conversation_id = (parent.conversation_id or parent.run_id) if parent else record.run_id
+            if parent:
+                from ..agent.settings import CONVERSATION_CONTEXT_MAX_CHARACTERS, CONVERSATION_CONTEXT_MAX_TURNS
+                record.parent_run_id = parent.run_id
+                record.material_role = material_role
+                record.material_names = list(parent.material_names)
+                record.material_snapshot = deepcopy({
+                    'materials': parent.state.get('materials', []),
+                    'evidence': [e for e in parent.state.get('evidence', []) if e.get('source_type') == 'user_material'],
+                }) if parent.material_names else None
+                history = [*parent.conversation_context, {
+                    'run_id': parent.run_id, 'question': parent.question,
+                    'clarifications': parent.state.get('clarification_history', []),
+                    'report': parent.state.get('final_report', ''), 'delivery_type': parent.delivery_type,
+                }][-CONVERSATION_CONTEXT_MAX_TURNS:]
+                # 按最近轮次优先保留；JSON截断只发生在文本数据中，不形成新证据。
+                import json
+                remaining = CONVERSATION_CONTEXT_MAX_CHARACTERS
+                selected = []
+                for item in reversed(history):
+                    text = item['text'] if 'text' in item else json.dumps(item, ensure_ascii=False)
+                    if remaining <= 0:
+                        break
+                    selected.insert(0, {'run_id': item['run_id'], 'text': text[:remaining],
+                                        'truncated': item.get('truncated', False) or len(text) > remaining})
+                    remaining -= min(len(text), remaining)
+                record.conversation_context = selected
+            self._prune()
             if materials:
                 try:
                     record.material_paths = self._upload_store.save(record.run_id, materials)
@@ -230,6 +268,9 @@ class RunManager:
             if record.engine is None:
                 options = ({'material_paths': record.material_paths, 'material_role': record.material_role}
                            if record.material_paths else {})
+                if record.parent_run_id:
+                    options.update(material_snapshot=record.material_snapshot, material_role=record.material_role,
+                                   conversation_context=record.conversation_context)
                 record.engine=self._factory(record.question,run_id=record.run_id,on_error=observed_errors.append, **options)
             record.engine.on_error=observed_errors.append
             record.engine.advance(answer,on_progress=lambda state:self._publish(record,state))

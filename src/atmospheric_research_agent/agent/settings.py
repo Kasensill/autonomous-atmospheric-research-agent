@@ -100,3 +100,7 @@ MATERIAL_UPLOAD_DIRECTORY = "tmp/material_uploads"  # 已忽略的本地原文�
 # 未在 .env 中覆盖时使用的模型连接默认值；密钥始终只从 .env 读取。
 DEFAULT_DEEPSEEK_MODEL = "deepseek-flash"
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+# 多轮研究仅携带最近4轮、合计最多12000字符的背景；可调，不改变单轮研究预算。
+CONVERSATION_CONTEXT_MAX_TURNS = 4
+CONVERSATION_CONTEXT_MAX_CHARACTERS = 12_000

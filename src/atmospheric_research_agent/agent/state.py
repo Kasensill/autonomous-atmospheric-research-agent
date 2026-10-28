@@ -182,6 +182,9 @@ class ResearchState(TypedDict, total=False):
     其余字段采用默认“新值覆盖旧值”的规则。
     """
 
+    # 历史问答与报告的有界背景，永远不自动进入正式证据。
+    conversation_context: list[dict[str, Any]]
+
     # 用户输入：在开始一次新研究任务时必须提供。
     question: str
 

@@ -138,6 +138,10 @@ def render_results(task: RemoteResearchTask) -> None:
             st.markdown(f"**补充条件 {index}**")
             st.write("追问：", item.get("question", ""))
             st.write("回答：", item.get("answer", ""))
+    if state.get('conversation_context'):
+        with st.expander('本轮使用的历史背景', expanded=False):
+            st.caption('仅作背景，旧报告不作为本轮正式证据；truncated 表示该轮背景已截断。')
+            st.json(state['conversation_context'], expanded=False)
     with st.expander("运行记录与完整 Trace", expanded=False):
         st.caption(f"开始时间（UTC）：{state.get('started_at', '未记录')} · "
                    f"结束时间（UTC）：{state.get('finished_at') or '尚未结束'}")
@@ -314,7 +318,31 @@ def main() -> None:
     if task.status == "abandoned":
         st.info("该任务已放弃，可新建研究。")
     render_results(task)
-
+    if task.status == 'completed':
+        st.divider()
+        st.subheader('继续提问')
+        st.caption('复用本会话材料与有限历史背景；每次提问重新取证、单独计算预算，可能产生 API 费用。')
+        with st.form(f"follow_up_{task.state['run_id']}"):
+            follow_question = st.text_area('接下来想研究什么？', max_chars=10000)
+            follow_role = st.selectbox('本轮材料用途', options=list(MATERIAL_ROLE_LABELS),
+                                      format_func=MATERIAL_ROLE_LABELS.get)
+            follow_submit = st.form_submit_button('继续研究', disabled=not service_ok)
+        if follow_submit:
+            if not follow_question.strip():
+                st.warning('请填写下一轮研究问题。')
+            else:
+                signature = (task.state['run_id'], follow_question.strip(), follow_role)
+                pending = st.session_state.get('follow_up_request')
+                if not pending or pending['signature'] != signature:
+                    pending = {'signature': signature, 'key': str(uuid4())}
+                    st.session_state['follow_up_request'] = pending
+                try:
+                    view = client.follow_up(task.state['run_id'], follow_question.strip(), pending['key'], follow_role)
+                    st.session_state['research_task'] = RemoteResearchTask(client, view)
+                    st.rerun()
+                except ApiError as error:
+                    st.error(str(error))
+        st.caption('会话编号：' + task.view.get('conversation_id', task.state['run_id']))
 
 
 if __name__ == "__main__":

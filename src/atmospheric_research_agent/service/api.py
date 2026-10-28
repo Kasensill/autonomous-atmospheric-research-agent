@@ -24,6 +24,10 @@ class CreateRun(BaseModel):
     question: Text
 
 
+class FollowUp(CreateRun):
+    material_role: Literal['auto','clue','analysis','both'] = 'auto'
+
+
 class Answer(BaseModel):
     model_config=ConfigDict(extra='forbid')
     question_id: UUID
@@ -32,6 +36,8 @@ class Answer(BaseModel):
 
 class RunView(BaseModel):
     run_id: str
+    conversation_id: str
+    parent_run_id: str | None = None
     question: str
     status: Literal['running','waiting_user','completed','failed','abandoned']
     delivery_type: Literal['full_report','limited_report','failure_notice'] | None
@@ -163,6 +169,12 @@ def create_app(manager: RunManager | None=None) -> FastAPI:
     @app.get('/runs/{run_id}',response_model=RunView)
     async def get(run_id: UUID, request: Request):
         return request.app.state.manager.get(str(run_id))
+
+    @app.post('/runs/{run_id}/follow-ups', status_code=202, response_model=RunView)
+    async def follow_up(run_id: UUID, body: FollowUp, request: Request,
+                        idempotency_key: Annotated[Key, Header()]):
+        return request.app.state.manager.create(body.question, idempotency_key,
+                    parent_run_id=str(run_id), material_role=body.material_role)
 
     @app.post('/runs/{run_id}/answers',status_code=202,response_model=RunView)
     async def answer(run_id: UUID, body: Answer, request: Request):

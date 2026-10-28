@@ -50,6 +50,10 @@ class ResearchClient:
                 headers={'Idempotency-Key': key})
         return self.request('POST','/runs',json={'question':question},headers={'Idempotency-Key':key})
 
+    def follow_up(self, run_id: str, question: str, key: str, material_role: str = 'auto'):
+        return self.request('POST', f'/runs/{run_id}/follow-ups',
+            json={'question': question, 'material_role': material_role}, headers={'Idempotency-Key': key})
+
     def get(self, run_id: str):
         return self.request('GET',f'/runs/{run_id}')
 
