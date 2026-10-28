@@ -4,7 +4,7 @@ import logging
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, Header, Query, Request
+from fastapi import FastAPI, File, Form, Header, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, StringConstraints
@@ -12,6 +12,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.datastructures import Headers
 
 from .manager import RunManager, ServiceError
+from .uploads import MaterialUpload
+from ..agent.settings import MATERIAL_MAX_FILES, MATERIAL_UPLOAD_MAX_BYTES, MATERIAL_UPLOAD_MAX_REQUEST_BYTES
 
 Text = Annotated[str,StringConstraints(strict=True,strip_whitespace=True,min_length=1,max_length=10000)]
 Key = Annotated[str,StringConstraints(pattern=r'^[A-Za-z0-9._:-]{1,128}$')]
@@ -43,6 +45,8 @@ class RunView(BaseModel):
     clarification_count: int
     limits: dict[str,int]
     latest_event: dict | None
+    material_files: list[str] = []
+    material_role: Literal['auto','clue','analysis','both'] | None = None
 
 
 class LocalHostGuard:
@@ -58,6 +62,30 @@ class LocalHostGuard:
         await self.app(scope,receive,send)
 
 
+class MaterialBodyGuard:
+    """在 multipart 解析前限制请求体，含无 Content-Length 的上传。"""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] != 'http' or scope.get('path') != '/runs/with-materials' or scope.get('method') != 'POST':
+            return await self.app(scope, receive, send)
+        length = Headers(scope=scope).get('content-length')
+        if length and length.isdigit() and int(length) > MATERIAL_UPLOAD_MAX_REQUEST_BYTES:
+            return await JSONResponse(status_code=413, content=ServiceError(
+                413, 'material_too_large', '上传材料请求超过大小上限。').payload())(scope, receive, send)
+        size = 0
+        async def limited_receive():
+            nonlocal size
+            message = await receive()
+            size += len(message.get('body', b''))
+            if size > MATERIAL_UPLOAD_MAX_REQUEST_BYTES:
+                # FastAPI 会将解析阶段的普通异常包装成400；HTTPException才能保留413。
+                raise StarletteHTTPException(status_code=413)
+            return message
+        await self.app(scope, limited_receive, send)
+
+
 def create_app(manager: RunManager | None=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app):
@@ -68,6 +96,7 @@ def create_app(manager: RunManager | None=None) -> FastAPI:
             app.state.manager.close()
 
     app=FastAPI(title='大气研究 Agent 本地服务',version='0.1.0',lifespan=lifespan)
+    app.add_middleware(MaterialBodyGuard)
     app.add_middleware(LocalHostGuard)
 
     @app.exception_handler(ServiceError)
@@ -81,6 +110,9 @@ def create_app(manager: RunManager | None=None) -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request, error):
+        if error.status_code == 413:
+            return JSONResponse(status_code=413, content=ServiceError(
+                413, 'material_too_large', '上传材料请求超过大小上限。').payload())
         return JSONResponse(status_code=error.status_code,content=ServiceError(error.status_code,
             'http_error','请求的地址或方法不受支持。').payload())
 
@@ -100,6 +132,29 @@ def create_app(manager: RunManager | None=None) -> FastAPI:
     @app.post('/runs',status_code=202,response_model=RunView)
     async def create(body: CreateRun, request: Request, idempotency_key: Annotated[Key,Header()]):
         return request.app.state.manager.create(body.question,idempotency_key)
+
+    @app.post('/runs/with-materials', status_code=202, response_model=RunView)
+    async def create_with_materials(request: Request, question: Annotated[Text, Form()],
+              files: Annotated[list[UploadFile], File()], idempotency_key: Annotated[Key, Header()],
+              material_role: Annotated[Literal['auto','clue','analysis','both'], Form()] = 'auto'):
+        try:
+            form = await request.form()
+            if (set(form) - {'question', 'material_role', 'files'}
+                    or len(form.getlist('question')) != 1 or len(form.getlist('material_role')) > 1):
+                raise ServiceError(422, 'invalid_request', '材料表单含未知字段或重复的任务参数。')
+            if len(files) > MATERIAL_MAX_FILES:
+                raise ServiceError(422, 'invalid_material', f'每个任务最多上传 {MATERIAL_MAX_FILES} 份材料。')
+            uploads = []
+            for item in files:
+                content = await item.read(MATERIAL_UPLOAD_MAX_BYTES + 1)
+                if len(content) > MATERIAL_UPLOAD_MAX_BYTES:
+                    raise ServiceError(413, 'material_too_large', '单份材料超过上传大小上限。')
+                uploads.append(MaterialUpload(item.filename or '', content))
+            return request.app.state.manager.create(question, idempotency_key,
+                         materials=uploads, material_role=material_role)
+        finally:
+            for item in files:
+                await item.close()
 
     @app.get('/runs',response_model=list[RunView])
     async def list_runs(request: Request):

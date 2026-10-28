@@ -41,7 +41,13 @@ class ResearchClient:
     def list_runs(self):
         return self.request('GET','/runs')
 
-    def create(self, question: str, key: str):
+    def create(self, question: str, key: str, *, materials: list[tuple[str, bytes]] | None = None,
+               material_role: str = 'auto'):
+        if materials:
+            return self.request('POST', '/runs/with-materials',
+                data={'question': question, 'material_role': material_role},
+                files=[('files', (name, content, 'application/octet-stream')) for name, content in materials],
+                headers={'Idempotency-Key': key})
         return self.request('POST','/runs',json={'question':question},headers={'Idempotency-Key':key})
 
     def get(self, run_id: str):
@@ -72,6 +78,8 @@ class RemoteResearchTask:
             self.error+=' 错误编号：'+error['error_id']
         self.elapsed_ms=view['elapsed_ms']
         self.state.update({k:view[k] for k in ['research_round','tool_call_count']})
+        self.state['material_files'] = view.get('material_files', [])
+        self.state['material_role'] = view.get('material_role')
 
     def refresh(self):
         view=self.client.get(self.state['run_id'])

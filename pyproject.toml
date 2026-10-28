@@ -23,9 +23,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0,<9.0", "httpx>=0.27,<1.0", "fastapi>=0.115,<1.0"]
+dev = ["pytest>=8.0,<9.0", "httpx>=0.27,<1.0", "fastapi>=0.115,<1.0", "python-multipart>=0.0.32,<1.0"]
 ui = ["streamlit>=1.40,<2.0", "httpx>=0.27,<1.0"]
-api = ["fastapi>=0.115,<1.0", "uvicorn>=0.30,<1.0"]
+api = ["fastapi>=0.115,<1.0", "uvicorn>=0.30,<1.0", "python-multipart>=0.0.32,<1.0"]
 corpus = ["PyMuPDF>=1.24,<2.0"]
 
 [tool.setuptools.packages.find]

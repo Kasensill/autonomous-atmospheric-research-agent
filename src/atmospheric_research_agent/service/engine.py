@@ -6,6 +6,7 @@ import json
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any, Callable
+from pathlib import Path
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
@@ -20,10 +21,17 @@ class ResearchSession:
     """由调用方串行驱动；不提供跨进程恢复或硬取消。"""
 
     def __init__(self, question: str, *, run_id: str | None = None,
-                 on_error: Callable[[Exception], None] | None = None) -> None:
+                 on_error: Callable[[Exception], None] | None = None,
+                 material_paths: list[str | Path] | None = None, material_role: str = 'auto') -> None:
         self.state: dict[str, Any] = dict(create_initial_state(question))
         if run_id is not None:
             self.state["run_id"] = run_id
+        if material_paths:
+            from ..agent.materials import load_materials
+            loaded = load_materials(material_paths, question, material_role)
+            for key in ('evidence', 'materials', 'material_role'):
+                self.state[key] = loaded[key]
+            self.state['trace'].extend(loaded['trace'])
         self.on_error = on_error
         self.checkpointer = InMemorySaver()
         self.graph = build_research_graph(checkpointer=self.checkpointer)

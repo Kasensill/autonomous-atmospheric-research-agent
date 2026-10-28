@@ -91,6 +91,12 @@ PDF_MAX_SPARSE_PAGE_RATIO = 0.8
 PDF_MAX_GARBLED_RATIO = 0.02
 PDF_MIN_CID_OCCURRENCES = 3
 
+# 本地 HTTP 上传入站限制；不改变 CLI、PDF 解析或研究循环预算，均为可调工程限额。
+MATERIAL_UPLOAD_MAX_BYTES = PDF_MAX_BYTES  # 每文件最多与 PDF 相同的 10MB，TXT/MD 同样受限。
+MATERIAL_UPLOAD_MAX_REQUEST_BYTES = MATERIAL_MAX_FILES * MATERIAL_UPLOAD_MAX_BYTES + 64 * 1024  # 含表单开销。
+MATERIAL_UPLOAD_MAX_NAME_CHARACTERS = 120  # 仅接受短文件名，不接受路径或设备名。
+MATERIAL_UPLOAD_DIRECTORY = "tmp/material_uploads"  # 已忽略的本地原文件目录；不作为解析缓存。
+
 # 未在 .env 中覆盖时使用的模型连接默认值；密钥始终只从 .env 读取。
 DEFAULT_DEEPSEEK_MODEL = "deepseek-flash"
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"

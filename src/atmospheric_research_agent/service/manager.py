@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from ..agent.settings import MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
 from .engine import ResearchSession
+from .uploads import MaterialUpload, UploadStore, upload_fingerprint, validate_uploads
 
 LOGGER = logging.getLogger(__name__)
 MAX_RECORDS = 20
@@ -21,6 +22,7 @@ PUBLIC_FIELDS = frozenset({
     'research_round', 'tool_call_count', 'clarification_history', 'evidence',
     'report_review', 'report_revision_count', 'report_mode', 'final_report',
     'program_limitations',
+    'materials', 'material_role',
 })
 
 
@@ -54,15 +56,22 @@ class RunRecord:
     error: dict | None = None
     elapsed_ms: float = 0
     engine: Any = None
+    material_paths: list = field(default_factory=list)
+    material_names: list[str] = field(default_factory=list)
+    material_role: str | None = None
+    material_fingerprint: str | None = None
+
 
 
 class RunManager:
     """一把锁保护准入及发布；锁内不运行模型，不等待 Future。"""
 
-    def __init__(self, *, session_factory: Callable = ResearchSession, max_records: int = MAX_RECORDS):
+    def __init__(self, *, session_factory: Callable = ResearchSession, max_records: int = MAX_RECORDS,
+                 upload_store: UploadStore | None = None):
         if max_records < 1:
             raise ValueError('max_records 必须大于零。')
         self._factory, self._max_records = session_factory, max_records
+        self._upload_store = upload_store or UploadStore()
         self._lock = RLock()
         self._records: dict[str, RunRecord] = {}
         self._keys: dict[str, str] = {}
@@ -95,6 +104,8 @@ class RunManager:
             'limits':{'research_rounds':MAX_RESEARCH_ROUNDS,'tool_calls':MAX_TOOL_CALLS,
                       'clarifications':MAX_CLARIFICATIONS},
             'latest_event':record.trace[-1] if record.trace else None,
+            'material_files': record.material_names,
+            'material_role': record.state.get('material_role', record.material_role),
         })
 
     def get(self, run_id: str) -> dict:
@@ -118,21 +129,39 @@ class RunManager:
             del self._records[victim.run_id]
             self._keys.pop(victim.key,None)
 
-    def create(self, question: str, key: str) -> dict:
+    def create(self, question: str, key: str, *, materials: list[MaterialUpload] | None = None,
+               material_role: str = 'auto') -> dict:
         question = question.strip()
         if not question or len(question)>10000 or not key or len(key)>128:
             raise ServiceError(422,'invalid_request','问题或请求标识无效。')
+        if materials is not None:
+            try:
+                validate_uploads(materials, material_role)
+            except ValueError as error:
+                raise ServiceError(422, 'invalid_material', str(error)) from None
+        fingerprint = upload_fingerprint(materials, material_role) if materials else None
         with self._lock:
             self._ensure_open()
             if key in self._keys:
                 record=self._record(self._keys[key])
-                if record.question != question:
-                    raise ServiceError(409,'idempotency_conflict','同一请求标识不能用于不同问题。',record.run_id)
+                if record.question != question or record.material_fingerprint != fingerprint:
+                    raise ServiceError(409,'idempotency_conflict','同一请求标识不能用于不同问题、材料或材料用途。',record.run_id)
                 return self._view(record)
             if self._active is not None:
                 raise ServiceError(409,'task_busy','请先完成或放弃当前等待中的任务。',self._active)
             self._prune()
             record=RunRecord(str(uuid4()),question,key)
+            if materials:
+                try:
+                    record.material_paths = self._upload_store.save(record.run_id, materials)
+                except OSError as error:
+                    error_id = str(uuid4())
+                    LOGGER.error('material_save_error error_id=%s type=%s', error_id, type(error).__name__)
+                    raise ServiceError(500, 'material_save_failed', '材料保存失败，请按错误编号检查服务日志。',
+                                       error_id=error_id) from None
+                record.material_names = [item.name for item in materials]
+                record.material_role = material_role
+                record.material_fingerprint = fingerprint
             record.state={'run_id':record.run_id,'question':question}
             self._records[record.run_id]=record
             self._keys[key]=record.run_id
@@ -199,7 +228,9 @@ class RunManager:
         observed_errors=[]
         try:
             if record.engine is None:
-                record.engine=self._factory(record.question,run_id=record.run_id,on_error=observed_errors.append)
+                options = ({'material_paths': record.material_paths, 'material_role': record.material_role}
+                           if record.material_paths else {})
+                record.engine=self._factory(record.question,run_id=record.run_id,on_error=observed_errors.append, **options)
             record.engine.on_error=observed_errors.append
             record.engine.advance(answer,on_progress=lambda state:self._publish(record,state))
             with self._lock:

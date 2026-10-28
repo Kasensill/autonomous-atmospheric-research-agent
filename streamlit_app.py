@@ -1,13 +1,16 @@
 """启动：python -m streamlit run streamlit_app.py --server.address 127.0.0.1"""
 
 from uuid import uuid4
+from hashlib import sha256
 
 import streamlit as st
 
 from atmospheric_research_agent.agent.settings import (
     MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS,
+    MATERIAL_MAX_FILES, MATERIAL_UPLOAD_MAX_BYTES,
 )
 from atmospheric_research_agent.ui.client import ApiError, RemoteResearchTask, ResearchClient
+from atmospheric_research_agent.agent.materials import coverage_text
 
 
 NODE_LABELS = {
@@ -20,14 +23,22 @@ NODE_LABELS = {
     "store_memory": "检查长期记忆准入",
 }
 
+MATERIAL_ROLE_LABELS = {
+    'auto': '自动判断（不明确时作为待核实线索）',
+    'clue': '待核实线索：用于检索，不能直接证明事实',
+    'analysis': '分析对象：总结、解读原文，不替原文背书',
+    'both': '两者并用：分析原文并核实其中说法',
+}
+
 
 def reset_task() -> None:
     """按钮回调在页面重绘前清理界面输入，不删除磁盘材料或长期记忆。"""
     for key in list(st.session_state):
-        if key in {"research_task", "question_draft", "confirm_new_task", "create_request"} or key.startswith(
-            ("active_question_", "clarification_answer_")
+        if key in {"research_task", "question_draft", "confirm_new_task", "create_request", "material_role_choice"} or key.startswith(
+            ("active_question_", "clarification_answer_", "material_uploads_")
         ):
             del st.session_state[key]
+    st.session_state['material_upload_generation'] = st.session_state.get('material_upload_generation', 0) + 1
 
 
 def request_new_task() -> None:
@@ -59,7 +70,10 @@ def render_results(task: RemoteResearchTask) -> None:
     d.metric("执行耗时", f"{task.elapsed_ms / 1000:.1f} 秒")
     st.caption("耗时不含等待回答；证据数量包含原始记录，不代表全部适用或结论可靠。")
 
-    report, evidence = st.tabs(["研究报告", "证据与核验"])
+    for event in state.get('trace', []):
+        if event.get('event') == 'material_skipped':
+            st.warning('材料未采用：' + str(event.get('detail', '解析失败。')))
+    report, evidence, material_tab = st.tabs(["研究报告", "证据与核验", "材料与覆盖"])
     with report:
         if task.status == "completed":
             if task.ending == "失败说明":
@@ -86,6 +100,8 @@ def render_results(task: RemoteResearchTask) -> None:
         for index, record in enumerate(state.get("evidence", []), 1):
             with st.expander(f"E{index} · {record.get('source_display_name', '未命名来源')}"):
                 st.text(record.get("source_location", ""))
+                if record.get('source_type') == 'user_material':
+                    st.caption(f"用户提供、未独立核实 · {record.get('locator', '')}")
                 st.caption(f"有效时间：{record.get('valid_at') or '未提供／不适用'}")
                 st.text(record.get("content", ""))
         if not state.get("evidence"):
@@ -94,6 +110,21 @@ def render_results(task: RemoteResearchTask) -> None:
         st.download_button("下载原始证据 JSON", task.export_json("evidence"),
                            file_name=f"evidence_{state['run_id']}.json", mime="application/json",
                            disabled=task.status != "completed")
+    with material_tab:
+        if not state.get('material_files'):
+            st.caption('本任务没有上传材料。')
+        else:
+            st.write('材料用途：', MATERIAL_ROLE_LABELS.get(state.get('material_role'), '正在判定'))
+            st.caption('材料由用户提供、未独立核实；含材料的运行不写入长期记忆。')
+            for name in state['material_files']:
+                st.text(name)
+            for item in state.get('materials', []):
+                st.write(item['display_name'])
+                st.caption(coverage_text([item]))
+                with st.expander('查看精确范围 · ' + item['display_name'], expanded=False):
+                    st.text('\n'.join(item['sent_ranges']) or '没有送入正文')
+            if not state.get('materials'):
+                st.caption('解析与覆盖信息在任务完成后提供；解析失败会在上方提示。')
     # 放在结果页底部，不依赖当前选择哪个报告／证据页签。
     st.divider()
     st.subheader("本次研究记录")
@@ -222,18 +253,31 @@ def main() -> None:
         with st.form("research_question"):
             question = st.text_area("研究问题", height=135, key="question_draft", max_chars=10000,
                                     placeholder="例如：为什么副热带高压主体常晴热少雨，边缘也一样吗？")
+            generation = st.session_state.get('material_upload_generation', 0)
+            uploaded = st.file_uploader('添加研究材料（可选）', type=['txt', 'md', 'pdf'],
+                accept_multiple_files=True, key=f'material_uploads_{generation}',
+                help=f'最多 {MATERIAL_MAX_FILES} 份，每份不超过 {MATERIAL_UPLOAD_MAX_BYTES // (1024 * 1024)}MB。TXT/MD 请使用 UTF-8；PDF 需有文字层，不做 OCR。')
+            role = st.selectbox('材料用途', options=list(MATERIAL_ROLE_LABELS),
+                format_func=MATERIAL_ROLE_LABELS.get, key='material_role_choice')
             submitted = st.form_submit_button("开始研究", type="primary", disabled=not service_ok)
-            st.caption("开始后服务端会调用已配置的模型和工具，可能产生 API 费用。本版不支持文件上传。")
+            st.caption("开始后服务端会调用已配置的模型和工具，可能产生 API 费用。材料保存在服务端本地，不入仓库；首版不自动清理文件，仅限本地可信使用。")
         if submitted:
             if not question.strip():
                 st.warning("请填写研究问题。")
+            elif len(uploaded) > MATERIAL_MAX_FILES:
+                st.warning(f'每个任务最多上传 {MATERIAL_MAX_FILES} 份材料。')
+            elif any(item.size == 0 or item.size > MATERIAL_UPLOAD_MAX_BYTES for item in uploaded):
+                st.warning('材料不能为空，且每份不能超过上传大小上限。')
             else:
+                files = [(item.name, item.getvalue()) for item in uploaded]
+                signature = (role, tuple((name, sha256(content).hexdigest()) for name, content in files)) if files else None
                 pending = st.session_state.get("create_request")
-                if not pending or pending["question"] != question.strip():
-                    pending = {"question":question.strip(), "key":str(uuid4())}
+                if not pending or pending["question"] != question.strip() or pending.get('material_signature') != signature:
+                    pending = {"question":question.strip(), "key":str(uuid4()), 'material_signature': signature}
                     st.session_state["create_request"] = pending
                 try:
-                    view = client.create(pending["question"], pending["key"])
+                    options = {'materials': files, 'material_role': role} if files else {}
+                    view = client.create(pending["question"], pending["key"], **options)
                     st.session_state["research_task"] = RemoteResearchTask(client, view)
                     st.rerun()
                 except ApiError as error:
@@ -243,6 +287,9 @@ def main() -> None:
         return
     st.text_area("研究问题", value=task.state["question"], height=135,
                  key=f"active_question_{task.state['run_id']}", disabled=True)
+    if task.view.get('material_files'):
+        st.write('本任务材料：', '、'.join(task.view['material_files']))
+        st.caption('追问后继续使用同一批材料；如需更换材料，请新建研究。')
     if task.status == "running":
         st.info("服务端正在研究。")
         render_progress(task.state, st.empty(), st.empty())
@@ -267,6 +314,7 @@ def main() -> None:
     if task.status == "abandoned":
         st.info("该任务已放弃，可新建研究。")
     render_results(task)
+
 
 
 if __name__ == "__main__":
