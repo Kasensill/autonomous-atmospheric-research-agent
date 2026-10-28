@@ -147,15 +147,37 @@ def load_materials(paths: list[str | Path], question: str, requested_role: str =
     return {"materials": materials, "material_role": role, "evidence": evidence, "trace": trace}
 
 
+def _compact_numbers(numbers: list[int], unit: str) -> str:
+    """只合并连续编号，不把未送入的页或段补进范围。"""
+    values = sorted(set(numbers))
+    groups = []
+    for value in values:
+        if groups and value == groups[-1][1] + 1:
+            groups[-1][1] = value
+        else:
+            groups.append([value, value])
+    return "第 " + "、".join(str(start) if start == end else f"{start}–{end}" for start, end in groups) + f" {unit}"
+
+
 def coverage_text(materials: list[dict]) -> str:
+    """面向报告、提示词与默认界面的摘要；精确 sent_ranges 原样保留在记录中。"""
     lines = []
     for record in materials:
-        ranges = "；".join(record["sent_ranges"]) or "无（本轮材料字符额度已用完）"
+        pdf = bool(record.get("document_pages")) or record["display_name"].lower().endswith(".pdf")
+        parsed = (f"{record['parsed_pages']} 页／" if pdf else "") + f"{record['parsed_characters']} 字符"
+        if not record["sent_characters"]:
+            scope = "未送入正文"
+        elif pdf and record.get("sent_pages"):
+            scope = "涉及" + _compact_numbers(record["sent_pages"], "页")
+        else:
+            paragraphs = [int(match[1]) for span in record["sent_ranges"]
+                          if (match := re.match(r"第 (\d+) 段[，,]", span))]
+            scope = ("涉及" + _compact_numbers(paragraphs, "段") if paragraphs
+                     else "已送入片段，精确定位见材料记录")
         lines.append(
-            f"材料覆盖：{record['display_name']}；已解析 {record['parsed_pages']} 页／"
-            f"{record['parsed_characters']} 字符；本轮送入模型 {record['sent_characters']} 字符"
-            f"（页码：{record['sent_pages']}；范围：{ranges}）。"
+            f"材料覆盖：{record['display_name']}；已解析 {parsed}；"
+            f"本轮送入模型 {record['sent_characters']} 字符（{scope}）。"
             + (f" {record['parse_note']}" if record.get("parse_note") else "")
-            + (" 已截断。" if record.get("truncated") else "")
+            + (" 已截断，仅分析已送入片段。" if record.get("truncated") else "")
         )
     return "\n".join(lines)

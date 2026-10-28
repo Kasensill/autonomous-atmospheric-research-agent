@@ -39,7 +39,7 @@ def test_material_loader_caps_and_locates_without_disclosing_path(tmp_path):
     assert all(len(e["content"]) <= MAX_SOURCE_CHARACTERS for e in bundle["evidence"])
     assert "第 1 段" in bundle["evidence"][0]["locator"]
     assert str(tmp_path) not in json.dumps(bundle, ensure_ascii=False)
-    assert f"已解析 0 页／{len(text)} 字符" in materials.coverage_text([record])
+    assert f"已解析 {len(text)} 字符" in materials.coverage_text([record])
     assert f"送入模型 {MATERIAL_MAX_CHARS_TOTAL} 字符" in materials.coverage_text([record])
 
 

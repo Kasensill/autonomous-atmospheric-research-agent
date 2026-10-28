@@ -841,6 +841,23 @@ def _task_question(state: ResearchState) -> str:
     return state["question"] + "\n用户补充记录（JSON）：\n" + json.dumps(history, ensure_ascii=False)
 
 
+def _comparison_scope_rule(*, review: bool = False) -> str:
+    """各阶段统一比较前提，避免把不同时空/口径的数值差异当作事实冲突。"""
+    rule = (
+        "比较不同来源的数值前，先核对统计时段、地点与空间尺度、指标、累计/平均/极值口径及预报/实况性质。"
+        "对于不同时段或不同统计口径的数据，未建立可比关系时，不得仅凭数值大小认定‘量级不符’、‘数据冲突’或据此支持/否定材料；"
+        "应写明‘现有来源未覆盖目标时段或口径，无法直接比较或核实’。"
+        "若存在明确的统计包含或累计关系，可以写出关系后推导，不能凭口径不同掩盖真正的矛盾。"
+        "不得一边说明不能直接比较，一边又把同一差异写成已证实的冲突。"
+    )
+    if review:
+        rule += (
+            "将尚不可比的数值差异判成事实冲突，属于现有的证据适用范围/时间错误，"
+            "必须写入 required_changes，不降为措辞建议；要求全文各处口径一致。"
+        )
+    return rule
+
+
 def _assessment_messages(state: ResearchState) -> list[BaseMessage]:
     """把问题、计划、正式证据明确地交给评估模型。"""
 
@@ -895,7 +912,7 @@ def _assessment_messages(state: ResearchState) -> list[BaseMessage]:
   "clarification_question": "仅 clarify 时填写具体追问，否则为 null",
   "limitation_reasons": ["上述允许代码；没有则 []"]
 }
-""" + "\n\n" + quota_sentence
+""" + "\n" + _comparison_scope_rule() + "\n\n" + quota_sentence
         ),
         HumanMessage(
             content=(
@@ -1156,7 +1173,7 @@ def _report_messages(state: ResearchState, mode: Literal["full", "limited"]) -> 
 - 只解释与当前任务直接相关且有证据支持的内容；不要逐个讨论未能证实的天气系统。
 - 引用证据时，在正文中说明其性质：预报、实况或事后分析、一般机制背景。预报不得写成实况；邻近地区的资料不得写成目标地点的情况。
 - 同一事实（时间、数值、名称）在不同证据中不一致时，必须在报告中写明分歧并标出各自的 [E#]，不得择一不提，也不得自行断定哪个正确；无法判断时列入局限性。例如一条证据称某极值出现在 17 时，另一条称 4 至 5 点。
-"""
+""" + "\n" + _comparison_scope_rule()
         ),
         HumanMessage(
             content=(
@@ -1219,7 +1236,7 @@ Verification（核验）要求只用给出的正式证据逐项检查关键主�
   "citation_issues": ["引用问题；没有则 []"],
   "required_changes": ["必须修改项的可执行修改动作；没有则 []"],
   "reason": "简短总体理由"
-}"""
+}""" + "\n" + _comparison_scope_rule(review=True)
         ),
         HumanMessage(
             content=(
@@ -1416,7 +1433,7 @@ def _revision_messages(state: ResearchState) -> list[BaseMessage]:
 - 即使审查意见遗漏也要保留产品性质：Open-Meteo 只能称“模型当前条件”，不称实况或站点实测。
 - 缺少气候基准不写偏冷/偏暖；保留简要篇幅约束，不添加无关天气系统的排除性段落。
 - 引用证据时，在正文中说明其性质：预报、实况或事后分析、一般机制背景。预报不得写成实况；邻近地区的资料不得写成目标地点的情况。
-- 同一事实（时间、数值、名称）在不同证据中不一致时，必须在报告中写明分歧并标出各自的 [E#]，不得择一不提，也不得自行断定哪个正确；无法判断时列入局限性。例如一条证据称某极值出现在 17 时，另一条称 4 至 5 点。"""
+- 同一事实（时间、数值、名称）在不同证据中不一致时，必须在报告中写明分歧并标出各自的 [E#]，不得择一不提，也不得自行断定哪个正确；无法判断时列入局限性。例如一条证据称某极值出现在 17 时，另一条称 4 至 5 点。""" + "\n" + _comparison_scope_rule()
         ),
         HumanMessage(
             content=(
