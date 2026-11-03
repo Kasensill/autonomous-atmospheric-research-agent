@@ -1,18 +1,20 @@
-"""进程内单任务管理；接口只读取快照，不并发访问执行中的图。"""
+"""SQLite任务档案与进程内单任务执行；接口不访问执行中的图。"""
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import UTC, datetime
 import logging
 from threading import RLock
+from pathlib import Path
 import traceback
 from typing import Any, Callable
 from uuid import uuid4
 
 from ..agent.settings import MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
 from .engine import ResearchSession
+from .storage import SQLiteRunStore
 from .uploads import MaterialUpload, UploadStore, upload_fingerprint, validate_uploads
 
 LOGGER = logging.getLogger(__name__)
@@ -70,16 +72,27 @@ class RunManager:
     """一把锁保护准入及发布；锁内不运行模型，不等待 Future。"""
 
     def __init__(self, *, session_factory: Callable = ResearchSession, max_records: int = MAX_RECORDS,
-                 upload_store: UploadStore | None = None):
+                 upload_store: UploadStore | None = None, db_path: str | Path = ":memory:"):
         if max_records < 1:
             raise ValueError('max_records 必须大于零。')
         self._factory, self._max_records = session_factory, max_records
         self._upload_store = upload_store or UploadStore()
         self._lock = RLock()
         self._records: dict[str, RunRecord] = {}
-        self._keys: dict[str, str] = {}
         self._active: str | None = None
         self._closed = False
+        self._storage_failed = False
+        self._store_closed = False
+        try:
+            self._store = SQLiteRunStore(db_path)
+            for payload in self._store.unfinished():
+                record = RunRecord(**payload)
+                self._interrupt(record)
+        except Exception as error:
+            if hasattr(self, '_store'):
+                self._store.close()
+            LOGGER.error('storage_startup_error type=%s', type(error).__name__)
+            raise RuntimeError('任务数据库不可用或已被其他服务占用；请检查目录、数据库版本及服务实例。') from None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='research')
 
     @property
@@ -87,14 +100,57 @@ class RunManager:
         with self._lock:
             return not self._closed
 
+    def _storage_error(self, error: Exception) -> ServiceError:
+        self._closed = self._storage_failed = True
+        error_id = str(uuid4())
+        LOGGER.error('storage_error error_id=%s type=%s', error_id, type(error).__name__)
+        return ServiceError(503, 'storage_unavailable', '任务档案存储失败，服务已停止接收新任务；请检查服务日志。',
+                            error_id=error_id)
+
+    def _read(self, method: str, *args):
+        if self._store_closed or self._storage_failed:
+            raise ServiceError(503, 'storage_unavailable', '任务档案不可用，请检查服务状态。')
+        try:
+            return getattr(self._store, method)(*args)
+        except Exception as error:
+            raise self._storage_error(error) from None
+
+    def _persist(self, record: RunRecord) -> None:
+        if self._storage_failed:
+            return
+        # 原始材料路径、图、检查点、消息和模型客户端不进入任务档案。
+        payload = {f.name: deepcopy(getattr(record, f.name)) for f in fields(record)
+                   if f.name not in {'engine', 'material_paths'}}
+        try:
+            self._store.save(payload)
+        except Exception as error:
+            raise self._storage_error(error) from None
+
     def _record(self, run_id: str) -> RunRecord:
-        if run_id not in self._records:
-            raise ServiceError(404,'run_not_found','任务不存在或已被清理。',run_id)
-        return self._records[run_id]
+        if run_id in self._records:
+            return self._records[run_id]
+        payload = self._read('get', run_id)
+        if payload is None:
+            raise ServiceError(404,'run_not_found','任务不存在。',run_id)
+        return RunRecord(**payload)
 
     def _touch(self, record: RunRecord) -> None:
         record.version += 1
         record.updated_at = now()
+        self._persist(record)
+
+    def _interrupt(self, record: RunRecord) -> None:
+        record.status = 'interrupted'
+        record.delivery_type = None
+        record.clarification = None
+        record.error = {'code': 'execution_interrupted',
+                        'message': '研究执行中断：服务已停止或重启，未自动恢复或重跑。请新建研究。',
+                        'run_id': record.run_id, 'error_id': None}
+        record.state['finished_at'] = now()
+        record.state.pop('final_report', None)
+        record.trace.append({'node': 'service', 'event': 'execution_interrupted', 'status': 'error',
+                             'timestamp': now(), 'detail': record.error['message']})
+        self._touch(record)
 
     def _view(self, record: RunRecord) -> dict:
         return deepcopy({
@@ -116,9 +172,13 @@ class RunManager:
         with self._lock:
             return self._view(self._record(run_id))
 
-    def list_runs(self) -> list[dict]:
+    def list_runs(self, limit: int = MAX_RECORDS, offset: int = 0,
+                  conversation_id: str | None = None) -> list[dict]:
+        from ..agent.settings import SERVICE_HISTORY_MAX_PAGE_SIZE
+        if not 1 <= limit <= SERVICE_HISTORY_MAX_PAGE_SIZE or offset < 0:
+            raise ServiceError(422, 'invalid_request', '历史列表分页参数无效。')
         with self._lock:
-            return [self._view(r) for r in reversed(list(self._records.values()))]
+            return [self._view(RunRecord(**r)) for r in self._read('list', limit, offset, conversation_id)]
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -127,11 +187,10 @@ class RunManager:
     def _prune(self) -> None:
         while len(self._records) >= self._max_records:
             victim = next((r for r in self._records.values()
-                           if r.status in {'completed','failed','abandoned'}),None)
+                           if r.status in {'completed','failed','abandoned','interrupted'}),None)
             if victim is None:
                 raise ServiceError(409,'task_busy','请先完成或放弃当前等待中的任务。',self._active)
             del self._records[victim.run_id]
-            self._keys.pop(victim.key,None)
 
     def create(self, question: str, key: str, *, materials: list[MaterialUpload] | None = None,
                material_role: str = 'auto', parent_run_id: str | None = None) -> dict:
@@ -146,8 +205,9 @@ class RunManager:
         fingerprint = upload_fingerprint(materials, material_role) if materials else None
         with self._lock:
             self._ensure_open()
-            if key in self._keys:
-                record=self._record(self._keys[key])
+            existing = self._read('by_key', key)
+            if existing is not None:
+                record = self._record(existing['run_id'])
                 if (record.question != question or record.material_fingerprint != fingerprint
                         or record.parent_run_id != parent_run_id
                         or (parent_run_id and record.material_role != material_role)):
@@ -201,8 +261,8 @@ class RunManager:
                 record.material_role = material_role
                 record.material_fingerprint = fingerprint
             record.state={'run_id':record.run_id,'question':question}
+            self._persist(record)
             self._records[record.run_id]=record
-            self._keys[key]=record.run_id
             self._active=record.run_id
             self._submit(record,None)
             return self._view(record)
@@ -233,11 +293,15 @@ class RunManager:
 
     def _publish(self, record: RunRecord, state: dict) -> None:
         with self._lock:
+            if record.status == 'interrupted':
+                return
             record.state=deepcopy({k:v for k,v in state.items() if k in PUBLIC_FIELDS})
             record.trace=deepcopy(state.get('trace',[]))
             self._touch(record)
 
     def _fail(self, record: RunRecord, error: Exception) -> None:
+        if record.status == 'interrupted':
+            return
         error_id=str(uuid4())
         # 不记录异常消息、局部变量、正文或绝对路径；位置只取模块文件名和行号。
         frames=[{'file':f.filename.replace('\\','/').rsplit('/',1)[-1], 'line':f.lineno,
@@ -265,6 +329,9 @@ class RunManager:
     def _execute(self, record: RunRecord, answer: str | None) -> None:
         observed_errors=[]
         try:
+            with self._lock:
+                if record.status == 'interrupted':
+                    return
             if record.engine is None:
                 options = ({'material_paths': record.material_paths, 'material_role': record.material_role}
                            if record.material_paths else {})
@@ -272,9 +339,16 @@ class RunManager:
                     options.update(material_snapshot=record.material_snapshot, material_role=record.material_role,
                                    conversation_context=record.conversation_context)
                 record.engine=self._factory(record.question,run_id=record.run_id,on_error=observed_errors.append, **options)
+            with self._lock:
+                if record.status == 'interrupted':
+                    self._release(record)
+                    return
             record.engine.on_error=observed_errors.append
             record.engine.advance(answer,on_progress=lambda state:self._publish(record,state))
             with self._lock:
+                if record.status == 'interrupted':
+                    self._release(record)
+                    return
                 self._publish(record,record.engine.state)
                 record.elapsed_ms=record.engine.elapsed_ms
                 if record.engine.status=='waiting':
@@ -311,7 +385,7 @@ class RunManager:
     def result(self, run_id: str) -> dict:
         with self._lock:
             record=self._record(run_id)
-            if record.status=='failed':
+            if record.status in {'failed', 'interrupted'}:
                 raise ServiceError(409,**record.error)
             if record.status=='abandoned':
                 raise ServiceError(409,'task_abandoned','该任务已放弃，没有研究报告。',run_id)
@@ -331,10 +405,18 @@ class RunManager:
 
     def close(self) -> None:
         with self._lock:
+            if self._store_closed:
+                return
             self._closed=True
-            for record in self._records.values():
-                if record.status=='waiting_user':
-                    record.status='abandoned';record.clarification=None
-                    self._release(record);self._touch(record)
-        # 不假装能杀死运行中的线程；进程退出仍可能等待底层调用。
-        self._executor.shutdown(wait=False,cancel_futures=False)
+            try:
+                for record in self._records.values():
+                    if record.status in {'running', 'waiting_user'}:
+                        waiting = record.status == 'waiting_user'
+                        self._interrupt(record)
+                        if waiting:
+                            self._release(record)
+            finally:
+                self._store.close()
+                self._store_closed = True
+                # 运行中的底层调用无法硬取消；晚到结果不得覆盖已保存的中断状态。
+                self._executor.shutdown(wait=False, cancel_futures=False)

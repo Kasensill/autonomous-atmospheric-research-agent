@@ -38,8 +38,11 @@ class ResearchClient:
     def health(self):
         return self.request('GET','/health')
 
-    def list_runs(self):
-        return self.request('GET','/runs')
+    def list_runs(self, *, limit: int = 20, offset: int = 0, conversation_id: str | None = None):
+        params = {'limit': limit, 'offset': offset}
+        if conversation_id is not None:
+            params['conversation_id'] = conversation_id
+        return self.request('GET','/runs', params=params)
 
     def create(self, question: str, key: str, *, materials: list[tuple[str, bytes]] | None = None,
                material_role: str = 'auto'):
@@ -107,6 +110,7 @@ class RemoteResearchTask:
 
     @property
     def ending(self):
+        if self.status=='interrupted': return '执行中断'
         if self.status=='failed': return '执行中止'
         if self.status=='abandoned': return '已放弃'
         if self.status=='waiting': return '等待补充信息'

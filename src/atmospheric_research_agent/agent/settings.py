@@ -104,3 +104,10 @@ DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 # 多轮研究仅携带最近4轮、合计最多12000字符的背景；可调，不改变单轮研究预算。
 CONVERSATION_CONTEXT_MAX_TURNS = 4
 CONVERSATION_CONTEXT_MAX_CHARACTERS = 12_000
+
+# 本地服务任务档案：相对项目根目录，运行数据不入库；不持久化图检查点。
+SERVICE_DATABASE_PATH = "data/runtime_service/research.sqlite3"
+# SQLite 锁等待上限（秒），超时按存储故障处理，不改变模型或研究预算。
+SERVICE_DATABASE_TIMEOUT_SECONDS = 5
+# 历史接口单页最多100条，防止一次返回无限量快照；可调。
+SERVICE_HISTORY_MAX_PAGE_SIZE = 100

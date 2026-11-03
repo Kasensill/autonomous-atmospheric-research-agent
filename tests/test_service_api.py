@@ -109,7 +109,7 @@ def test_standard_asgi_client_lifespan(monkeypatch):
     require_loopback()
     from fastapi.testclient import TestClient
     monkeypatch.setattr(engine,'build_research_graph',fake_graph)
-    with TestClient(create_app(),base_url='http://localhost') as client:
+    with TestClient(create_app(db_path=":memory:"),base_url='http://localhost') as client:
         assert client.get('/health').status_code==200
         run_id=client.post('/runs',json={'question':'clarify'},headers={'Idempotency-Key':'standard'}).json()['run_id']
         waiting=wait(client,run_id,'waiting_user')

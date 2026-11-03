@@ -119,10 +119,9 @@ def test_failure_releases_slot_no_secret_logging_and_retention(caplog):
             manager.result(item['run_id'])
         assert error.value.code=='execution_failed'
         new=manager.create('ok','two');eventually(manager,new['run_id'],'completed')
-        assert len(manager.list_runs())==1
-        with pytest.raises(ServiceError) as error:
-            manager.get(item['run_id'])
-        assert error.value.status_code==404
+        assert len(manager.list_runs(limit=1))==1
+        assert manager.get(item['run_id'])['status']=='failed'
+        assert manager.create('boom','one')['run_id']==item['run_id']
     finally:
         manager.close()
 
@@ -184,7 +183,7 @@ def test_running_cannot_be_abandoned_and_close_rejects_new():
             manager.create('next','next')
         assert error.value.status_code==503
         gate.set()
-        eventually(manager,item['run_id'],'completed')
+        eventually(manager,item['run_id'],'interrupted')
     finally:
         gate.set();manager.close()
 

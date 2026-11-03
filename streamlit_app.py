@@ -43,7 +43,7 @@ def reset_task() -> None:
 
 def request_new_task() -> None:
     task = st.session_state.get("research_task")
-    if task is not None and task.status not in {"completed", "failed", "abandoned"}:
+    if task is not None and task.status not in {"completed", "failed", "abandoned", "interrupted"}:
         st.session_state["confirm_new_task"] = True
     else:
         reset_task()
@@ -85,7 +85,7 @@ def render_results(task: RemoteResearchTask) -> None:
             st.markdown(state["final_report"])
             st.download_button("下载 Markdown", state["final_report"],
                                file_name=f"research_{state['run_id']}.md", mime="text/markdown")
-        elif task.status == "failed":
+        elif task.status in {"failed", "interrupted"}:
             st.error(task.error)
             st.info("已保留可查询的进度与轨迹。不自动重试，避免重复请求；可新建任务。")
         elif task.status == "abandoned":
@@ -201,7 +201,8 @@ def main() -> None:
     runs = []
     try:
         client.health()
-        runs = client.list_runs()
+        history_offset = st.session_state.get("history_offset", 0)
+        runs = client.list_runs(offset=history_offset)
         service_ok = True
     except ApiError as error:
         st.warning(str(error))
@@ -234,15 +235,24 @@ def main() -> None:
         st.markdown("**服务端任务**")
         for view in runs:
             label = " ".join(view["question"].split())[:25]
-            if st.button(f"{view['status']} · {label}", key=f"open_{view['run_id']}"):
+            status_label = "执行中断" if view["status"] == "interrupted" else view["status"]
+            if st.button(f"{status_label} · {label}", key=f"open_{view['run_id']}"):
                 st.session_state["research_task"] = RemoteResearchTask(client, view)
                 st.session_state.pop("confirm_new_task", None)
                 st.rerun()
+        previous, following = st.columns(2)
+        if previous.button('上一页', disabled=not service_ok or st.session_state.get('history_offset', 0) == 0):
+            st.session_state['history_offset'] = max(0, st.session_state.get('history_offset', 0) - 20)
+            st.rerun()
+        if following.button('下一页', disabled=not service_ok or len(runs) < 20):
+            st.session_state['history_offset'] = st.session_state.get('history_offset', 0) + 20
+            st.rerun()
+        st.caption('历史页码：' + str(st.session_state.get('history_offset', 0) // 20 + 1))
         st.divider()
         st.markdown("**程序预算**")
         st.caption(f"研究 {MAX_RESEARCH_ROUNDS} 轮 · 工具 {MAX_TOOL_CALLS} 次 · 追问 {MAX_CLARIFICATIONS} 次")
         st.caption("由现有研究图控制，界面不修改预算。凭据在服务端本地 .env 配置。")
-        st.caption("本地单人服务，一次一个未结束任务。页面可重新选择任务；服务重启后内存任务丢失。仅保留有限历史，不支持运行中强制取消。")
+        st.caption("本地单人服务，一次一个未结束任务。历史保存在本地 SQLite；服务重启后可查看已完成报告并继续提问，未结束任务标为执行中断。不支持运行中强制取消。")
     if st.session_state.get("api_error"):
         st.error(st.session_state.pop("api_error"))
     if task is None:

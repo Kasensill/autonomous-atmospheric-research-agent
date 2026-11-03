@@ -1,5 +1,6 @@
 """FastAPI 工厂；创建应用时不启动研究或访问外部 API。"""
 from contextlib import asynccontextmanager
+from pathlib import Path
 import logging
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
@@ -13,7 +14,8 @@ from starlette.datastructures import Headers
 
 from .manager import RunManager, ServiceError
 from .uploads import MaterialUpload
-from ..agent.settings import MATERIAL_MAX_FILES, MATERIAL_UPLOAD_MAX_BYTES, MATERIAL_UPLOAD_MAX_REQUEST_BYTES
+from ..agent.settings import (MATERIAL_MAX_FILES, MATERIAL_UPLOAD_MAX_BYTES, MATERIAL_UPLOAD_MAX_REQUEST_BYTES,
+                              SERVICE_DATABASE_PATH, SERVICE_HISTORY_MAX_PAGE_SIZE)
 
 Text = Annotated[str,StringConstraints(strict=True,strip_whitespace=True,min_length=1,max_length=10000)]
 Key = Annotated[str,StringConstraints(pattern=r'^[A-Za-z0-9._:-]{1,128}$')]
@@ -39,7 +41,7 @@ class RunView(BaseModel):
     conversation_id: str
     parent_run_id: str | None = None
     question: str
-    status: Literal['running','waiting_user','completed','failed','abandoned']
+    status: Literal['running','waiting_user','completed','failed','abandoned','interrupted']
     delivery_type: Literal['full_report','limited_report','failure_notice'] | None
     version: int
     updated_at: str
@@ -92,10 +94,11 @@ class MaterialBodyGuard:
         await self.app(scope, limited_receive, send)
 
 
-def create_app(manager: RunManager | None=None) -> FastAPI:
+def create_app(manager: RunManager | None=None, *, db_path: str | Path | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app):
-        app.state.manager=manager or RunManager()
+        database = db_path if db_path is not None else Path(__file__).resolve().parents[3] / SERVICE_DATABASE_PATH
+        app.state.manager=manager if manager is not None else RunManager(db_path=database)
         try:
             yield
         finally:
@@ -133,7 +136,7 @@ def create_app(manager: RunManager | None=None) -> FastAPI:
     async def health(request: Request):
         if not request.app.state.manager.available:
             raise ServiceError(503,'service_unavailable','服务正在关闭或执行设施不可用。')
-        return {'status':'ok','storage':'in_memory','max_active_runs':1,'hard_cancel':False}
+        return {'status':'ok','storage':'sqlite','max_active_runs':1,'hard_cancel':False}
 
     @app.post('/runs',status_code=202,response_model=RunView)
     async def create(body: CreateRun, request: Request, idempotency_key: Annotated[Key,Header()]):
@@ -163,8 +166,9 @@ def create_app(manager: RunManager | None=None) -> FastAPI:
                 await item.close()
 
     @app.get('/runs',response_model=list[RunView])
-    async def list_runs(request: Request):
-        return request.app.state.manager.list_runs()
+    async def list_runs(request: Request, limit: Annotated[int, Query(ge=1, le=SERVICE_HISTORY_MAX_PAGE_SIZE)] = 20,
+                        offset: Annotated[int, Query(ge=0)] = 0, conversation_id: UUID | None = None):
+        return request.app.state.manager.list_runs(limit, offset, str(conversation_id) if conversation_id else None)
 
     @app.get('/runs/{run_id}',response_model=RunView)
     async def get(run_id: UUID, request: Request):

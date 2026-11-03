@@ -1,4 +1,4 @@
-"""固定本地单 worker 启动；不要用 --reload 或多个 worker 承载内存任务。"""
+"""固定本地单 worker 启动；执行图仍在进程内，同一 SQLite 只允许一个服务实例。"""
 import uvicorn
 
 
