@@ -50,6 +50,8 @@ def test_deepseek_agent_client_disables_thinking_mode_for_tool_loop(monkeypatch)
     nodes_module._create_base_model()
 
     assert captured_kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert captured_kwargs["timeout"] == nodes_module.MODEL_REQUEST_TIMEOUT_SECONDS
+    assert captured_kwargs["max_retries"] == 0
 
 
 def test_parse_no_tool_decision_rejects_plain_text() -> None:

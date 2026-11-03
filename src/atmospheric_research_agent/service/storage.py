@@ -2,11 +2,34 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
+import unicodedata
+from string import punctuation
 from pathlib import Path
 import sqlite3
 from threading import RLock
 
 from ..agent.settings import SERVICE_DATABASE_TIMEOUT_SECONDS
+
+
+def _utc_timestamp(*values: str | None) -> str | None:
+    for value in values:
+        if not isinstance(value, str) or not value:
+            continue
+        try:
+            instant = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+            if instant.tzinfo is None:
+                instant = instant.replace(tzinfo=UTC)
+            return instant.astimezone(UTC).isoformat(timespec="microseconds")
+        except (ValueError, OverflowError):
+            continue
+    return None
+
+
+def _history_key(value: str | None) -> str:
+    normalized = unicodedata.normalize("NFKC", value if isinstance(value, str) else "").casefold()
+    return "".join(ch for ch in normalized if not ch.isspace()
+                   and ch not in punctuation and not unicodedata.category(ch).startswith("P"))
 
 
 class SQLiteRunStore:
@@ -25,6 +48,8 @@ class SQLiteRunStore:
                 self._acquire_owner(path)
             self._connection = sqlite3.connect(str(path), timeout=SERVICE_DATABASE_TIMEOUT_SECONDS,
                                                check_same_thread=False)
+            self._connection.create_function("history_utc", 3, _utc_timestamp, deterministic=True)
+            self._connection.create_function("history_key", 1, _history_key, deterministic=True)
             version = self._connection.execute('PRAGMA user_version').fetchone()[0]
             if version not in {0, self.SCHEMA_VERSION}:
                 raise ValueError('不支持此数据库版本；请保留原文件并使用兼容版本。')
@@ -83,22 +108,45 @@ class SQLiteRunStore:
         with self._lock:
             return [json.loads(row[0]) for row in self._connection.execute(query, (*args, limit, offset))]
 
-    def history_before(self, current_id: str, limit: int, *, conversation_id: str | None = None,
-                       target_id: str | None = None, completed_reports: bool = False) -> list[dict]:
-        query = "SELECT payload FROM runs WHERE rowid < (SELECT rowid FROM runs WHERE run_id=?)"
+    def history_candidates(self, current_id: str, limit: int, *, target_id: str | None,
+                           topic: str | None, kind: str | None, reports_only: bool,
+                           prefix_length: int) -> tuple[list[dict], dict]:
+        scope = "run_id <> ?"
         args = [current_id]
-        if completed_reports:
-            query += (" AND status='completed' AND "
-                      "json_extract(payload, '$.delivery_type') IN ('full_report','limited_report')")
-        if conversation_id is not None:
-            query += " AND conversation_id=?"
-            args.append(conversation_id)
-        if target_id is not None:
-            query += " AND run_id=?"
+        if target_id:
+            scope += " AND run_id = ?"
             args.append(target_id)
+        delivery = "json_extract(payload, '$.delivery_type')"
+        body = "json_extract(payload, '$.state.final_report')"
+        base = (f"status = 'completed' AND COALESCE({delivery}, '') <> 'failure_notice' "
+                f"AND typeof({body}) = 'text' AND length(trim({body}, char(9)||char(10)||char(13)||' ')) > 0")
+        if reports_only or kind == "report":
+            base += f" AND {delivery} IN ('full_report', 'limited_report')"
+        elif kind == "answer":
+            base += f" AND {delivery} = 'history_answer'"
+        key = _history_key(topic)
+        sql = f"""SELECT run_id, {delivery} AS delivery_type,
+                   json_extract(payload, '$.question') AS question,
+                   json_extract(payload, '$.parent_run_id') AS parent_run_id,
+                   history_utc(json_extract(payload, '$.state.finished_at'),
+                               json_extract(payload, '$.updated_at'),
+                               json_extract(payload, '$.state.started_at')) AS updated_at,
+                   CASE WHEN ? IS NULL THEN 1 WHEN ? = '' THEN 0 ELSE
+                     instr(history_key(json_extract(payload, '$.question')), ?) > 0 OR
+                     instr(history_key(substr({body}, 1, ?)), ?) > 0 END AS topic_match
+                   FROM runs WHERE {scope} AND {base}
+                   ORDER BY updated_at DESC, run_id ASC LIMIT ?"""
         with self._lock:
-            return [json.loads(row[0]) for row in self._connection.execute(
-                query + " ORDER BY rowid DESC LIMIT ?", (*args, limit))]
+            counts = self._connection.execute(
+                f"""SELECT count(*), count(CASE WHEN status='completed' THEN 1 END),
+                     count(CASE WHEN {base} THEN 1 END) FROM runs WHERE {scope}""", args).fetchone()
+            cursor = self._connection.execute(sql, (topic, key, key, prefix_length, key, *args, limit))
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, row)) for row in cursor]
+        matches = [row for row in rows if row.pop("topic_match")]
+        return matches, {"candidate_count_in_scope": counts[0], "completed_count": counts[1],
+                         "candidate_count_after_base_filter": counts[2],
+                         "candidate_count_after_topic": len(matches), "truncated": counts[2] > limit}
 
     def unfinished(self) -> list[dict]:
         with self._lock:

@@ -30,6 +30,7 @@ from .nodes import (
     verify_report_node,
 )
 from .state import ResearchState
+from .model_trace import model_trace_node
 from .history import HistoryContext, lookup_history_node, answer_history_node
 from .resume import ResumeValidatedGraph
 from .evidence import usable_evidence
@@ -55,7 +56,8 @@ def _instrument_node(node_name: str, node: Callable[[ResearchState], dict[str, A
     def instrumented_node(state: ResearchState) -> dict[str, Any]:
         started_at = _utc_now()
         started = perf_counter()
-        update = node(state)
+        with model_trace_node(node_name):
+            update = node(state)
         if not isinstance(update, dict):
             raise TypeError(f"节点 {node_name} 必须返回 dict 类型的 State 增量。")
 

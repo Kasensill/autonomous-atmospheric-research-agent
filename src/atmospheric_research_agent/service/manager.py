@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, fields
 from datetime import UTC, datetime
 import logging
 import sqlite3
+from uuid import UUID
 from threading import RLock
 from pathlib import Path
 import traceback
@@ -15,8 +16,10 @@ from uuid import uuid4
 
 from ..agent.settings import MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
 from .engine import ResearchSession
-from ..agent.history import HistoryContext, archived_history
-from ..agent.settings import HISTORY_ARCHIVE_SCAN_LIMIT
+from ..agent.model_trace import model_trace_scope, failure_metadata
+from ..agent.tools.source_reader import source_read_scope
+from ..agent.history import HistoryContext, resolve_archived_history, lookup_summary, _EXPLICIT_RUN_ID
+from ..agent.settings import HISTORY_ARCHIVE_SCAN_LIMIT, HISTORY_TOPIC_REPORT_PREFIX
 from .storage import SQLiteRunStore
 from .uploads import MaterialUpload, UploadStore, upload_fingerprint, validate_uploads
 
@@ -70,6 +73,8 @@ class RunRecord:
     conversation_context: list = field(default_factory=list)
     material_snapshot: dict | None = None
     resume_count: int = 0
+    history_source_run_id: str | None = None
+    history_lookup: dict | None = None
 
 
 class RunManager:
@@ -307,20 +312,25 @@ class RunManager:
 
     def _history_context(self, record: RunRecord) -> HistoryContext:
         def lookup(request: dict, state: dict) -> dict:
-            target = request["target"]
-            target_id = request["value"].lower() if target == "run_id" else None
-            if target == "latest" and record.parent_run_id:
-                target_id = record.parent_run_id
-            scope = record.conversation_id if record.parent_run_id and target != "run_id" else None
+            target_id = None
+            if request["target"] == "run_id":
+                try:
+                    target_id = str(UUID(request["value"]))
+                except ValueError:
+                    target_id = None
+                text = " ".join([state["question"], *(x["answer"] for x in state.get("clarification_history", []))])
+                if not target_id or target_id not in {record.parent_run_id, *_EXPLICIT_RUN_ID.findall(text.lower())}:
+                    return {"status": "not_found", "history_lookup": lookup_summary(request, not_found_reason="no_match")}
             with self._lock:
                 try:
-                    rows = self._store.history_before(record.run_id, HISTORY_ARCHIVE_SCAN_LIMIT,
-                                                      conversation_id=scope, target_id=target_id,
-                                                      completed_reports=request["purpose"] == "answer_history"
-                                                      or target == "latest")
+                    rows, counts = self._store.history_candidates(
+                        record.run_id, HISTORY_ARCHIVE_SCAN_LIMIT, target_id=target_id,
+                        topic=request["value"] if request["target"] == "topic" else None,
+                        kind=request["kind"] if not target_id else None, reports_only=request["purpose"] == "support_research",
+                        prefix_length=HISTORY_TOPIC_REPORT_PREFIX)
+                    return resolve_archived_history(request, state, rows, counts, self._store.get)
                 except (sqlite3.Error, ValueError) as error:
                     raise self._storage_error(error) from None
-            return archived_history(request, state, rows, parent_run_id=record.parent_run_id)
         return HistoryContext(lookup)
 
     def resume(self, run_id: str) -> dict:
@@ -379,12 +389,20 @@ class RunManager:
                 return
             record.state=deepcopy({k:v for k,v in state.items() if k in PUBLIC_FIELDS})
             graph_trace = state.get('trace', [])
-            if record.resume_count:
-                previous_count = sum(item.get('node') != 'service' for item in record.trace)
-                record.trace.extend(deepcopy(graph_trace[previous_count:]))
-            else:
-                record.trace = deepcopy(graph_trace)
+            for entry in reversed(graph_trace):
+                if entry.get("event") == "history_lookup" and "history_lookup" in entry:
+                    record.history_lookup = deepcopy(entry["history_lookup"])
+                    record.history_source_run_id = record.history_lookup["selected_run_id"]
+                    break
+            previous_count = sum(item.get('node') != 'service' for item in record.trace)
+            record.trace.extend(deepcopy(graph_trace[previous_count:]))
             self._touch(record)
+
+    def _publish_model_event(self, record: RunRecord, event: dict) -> None:
+        with self._lock:
+            if record.status == 'running' and not self._store_closed:
+                record.trace.append(event)
+                self._touch(record)
 
     def _fail(self, record: RunRecord, error: Exception) -> None:
         if record.status == 'interrupted':
@@ -393,13 +411,18 @@ class RunManager:
         # 不记录异常消息、局部变量、正文或绝对路径；位置只取模块文件名和行号。
         frames=[{'file':f.filename.replace('\\','/').rsplit('/',1)[-1], 'line':f.lineno,
                  'function':f.name} for f in traceback.extract_tb(error.__traceback__)]
-        LOGGER.error('research_error run_id=%s error_id=%s type=%s frames=%s',
-                     record.run_id,error_id,type(error).__name__,frames)
+        metadata = failure_metadata(error)
+        LOGGER.error('research_error run_id=%s error_id=%s diagnosis=%s frames=%s',
+                     record.run_id, error_id, metadata, frames)
         record.status='failed'
         record.delivery_type=None
         record.clarification=None
         record.error={'code':'execution_failed','message':'本轮研究执行失败，请按错误编号检查服务端日志。',
                       'run_id':record.run_id,'error_id':error_id}
+        if metadata["failure_kind"] != "model_error":
+            status = metadata.get("http_status")
+            reason = f"HTTP {status}" if status else metadata["failure_kind"]
+            record.error["message"] = f"模型请求失败（{reason}），请按错误编号检查 Trace。"
         self._touch(record)
 
     def _release(self, record: RunRecord) -> None:
@@ -437,7 +460,11 @@ class RunManager:
             record.engine.on_error=observed_errors.append
             # 恢复到已有人工中断或已完成的检查点时，直接发布状态。
             if answer is not None or record.engine.status not in {'waiting', 'completed'}:
-                record.engine.advance(answer,on_progress=lambda state:self._publish(record,state))
+                publish_event = lambda event: self._publish_model_event(record, event)
+                with model_trace_scope(publish_event), source_read_scope(
+                    lambda: self._closed or record.status == 'interrupted', publish_event
+                ):
+                    record.engine.advance(answer,on_progress=lambda state:self._publish(record,state))
             with self._lock:
                 if record.status == 'interrupted':
                     self._release(record)

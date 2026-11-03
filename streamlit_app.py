@@ -51,7 +51,12 @@ def request_new_task() -> None:
 
 def render_progress(state: dict, activity, counters) -> None:
     completed = [item for item in state.get("trace", []) if item.get("event") == "node_completed"]
-    if completed:
+    latest_event = next((item for item in reversed(state.get("trace", []))
+                         if item.get("event") in {"node_completed", "model_request_started", "model_response_headers"}), None)
+    if latest_event and latest_event.get("event") in {"model_request_started", "model_response_headers"}:
+        name = latest_event.get("graph_node") or "模型调用"
+        activity.info(f"{NODE_LABELS.get(name, name)} · {latest_event['detail']}")
+    elif completed:
         latest = completed[-1]
         activity.info(f"已完成：{NODE_LABELS.get(latest['node'], latest['node'])} · 正在继续研究")
     counters.caption(

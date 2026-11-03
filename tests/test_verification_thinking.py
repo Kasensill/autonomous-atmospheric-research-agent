@@ -13,7 +13,9 @@ from atmospheric_research_agent.agent.state import create_initial_state
 def clients(monkeypatch):
     created = []
     monkeypatch.setattr(nodes, "load_dotenv", lambda: None)
+    monkeypatch.setattr(nodes, "model_trace_options", lambda timeout: {})
     monkeypatch.setenv("DEEPSEEK_API_KEY", "offline-placeholder")
+    monkeypatch.setenv("RESEARCH_MODEL_PROVIDER", "deepseek")
     monkeypatch.setenv("DEEPSEEK_MODEL", "offline-model")
     monkeypatch.setenv("DEEPSEEK_BASE_URL", "https://offline.invalid")
 
@@ -47,6 +49,8 @@ def test_only_verification_client_can_enable_thinking(monkeypatch, clients, sett
     baseline = {
         "model": "offline-model", "api_key": "offline-placeholder",
         "base_url": "https://offline.invalid", "temperature": 0,
+        "timeout": nodes.MODEL_REQUEST_TIMEOUT_SECONDS, "max_retries": 0,
+        "http_socket_options": (),
         "extra_body": {"thinking": {"type": "disabled"}},
     }
     assert all(client.kwargs == baseline for client in clients[:-1])

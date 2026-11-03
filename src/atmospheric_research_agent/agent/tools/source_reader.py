@@ -1,13 +1,35 @@
 """读取公开网页正文并保留可获得的元数据。"""
 
 from ipaddress import ip_address
+from contextlib import contextmanager
+from contextvars import ContextVar
+from datetime import UTC, datetime
+import json
+from pathlib import Path
 import re
+import subprocess
+import sys
+from tempfile import TemporaryDirectory
+from time import monotonic
+from types import SimpleNamespace
 from typing import Any
 from urllib.parse import unquote, urlparse
 
 from langchain_core.tools import tool
 
-from ..settings import MAX_SOURCE_CHARACTERS
+from ..settings import MAX_SOURCE_CHARACTERS, PDF_MAX_BYTES
+
+SOURCE_TIMEOUT_SECONDS = 30
+_read_context = ContextVar("source_read_context", default=None)
+
+
+@contextmanager
+def source_read_scope(cancelled, publish):
+    token = _read_context.set((cancelled, publish))
+    try:
+        yield
+    finally:
+        _read_context.reset(token)
 
 MARKDOWN_LINK_PATTERN = re.compile(r"^\[[^\]]*\]\((https?://[^\s)]+)\)$")
 # 网页提取的启发式解码质量门槛；不代表事实真实性或完整乱码识别。
@@ -40,10 +62,14 @@ def _pdf_display_metadata(title: Any, author: Any, url: str) -> tuple[str, str |
     return display_title, display_author
 
 
-def _read_pdf_source(data: bytes, url: str, diagnostics: dict) -> dict[str, Any]:
+def _read_pdf_source(data: bytes, url: str, diagnostics: dict, *, isolated=False) -> dict[str, Any]:
     from .pdf_reader import read_pdf_text
 
-    result = read_pdf_text(data)
+    if isolated:
+        from .pdf_reader import _extract_pdf_bytes
+        result = _extract_pdf_bytes(data)
+    else:
+        result = read_pdf_text(data)
     diagnostics["pdf"] = result.get("diagnostics", {})
     if result["status"] != "success":
         return {"status": "error", "tool": "read_source", "url": url,
@@ -97,7 +123,7 @@ def _validate_public_url(url: str) -> str:
     return clean_url
 
 
-def read_public_source(url: str) -> dict[str, Any]:
+def read_public_source(url: str, *, fetch=None, progress=lambda stage: None) -> dict[str, Any]:
     """下载并提取网页主正文、标题、作者、日期和站点名称。"""
 
     diagnostics: dict[str, Any] = {
@@ -126,7 +152,8 @@ def read_public_source(url: str) -> dict[str, Any]:
     stage = "网页下载"
     try:
         diagnostics.update(download_attempted=True, downloaded_bytes=None)
-        response = trafilatura.fetch_response(clean_url, decode=False, with_headers=True)
+        response = (fetch(clean_url) if fetch else
+                    trafilatura.fetch_response(clean_url, decode=False, with_headers=True))
         if response is None:
             return failure("网页下载失败或未获得响应内容。", clean_url)
         downloaded = response.data or b""
@@ -144,8 +171,10 @@ def read_public_source(url: str) -> dict[str, Any]:
         if not downloaded:
             return failure("网页下载失败或未获得响应内容。", clean_url)
         if any(diagnostics["pdf_detection"].values()):
-            return _read_pdf_source(downloaded, clean_url, diagnostics)
+            progress("parse_pdf")
+            return _read_pdf_source(downloaded, clean_url, diagnostics, isolated=fetch is not None)
         stage = "网页正文提取"
+        progress("parse_html")
         content = trafilatura.extract(
             downloaded,
             url=clean_url,
@@ -165,6 +194,9 @@ def read_public_source(url: str) -> dict[str, Any]:
         if invalid_count / len(content) > HTML_MAX_INVALID_CHARACTER_RATIO:
             return failure("网页正文读取失败：正文含大量替换字符或异常控制字符，无法可靠读取。", clean_url)
         metadata = trafilatura.extract_metadata(downloaded, default_url=clean_url)
+    except SourceTooLarge:
+        progress("size_limit")
+        return failure(f"来源超过 {PDF_MAX_BYTES} 字节上限。", clean_url)
     except Exception as error:
         # 第三方异常文本可能包含正文，只暴露阶段和异常类型。
         return failure(f"{stage}失败（{type(error).__name__}）。", clean_url)
@@ -192,6 +224,119 @@ def read_public_source(url: str) -> dict[str, Any]:
     }
 
 
+class SourceTooLarge(Exception):
+    pass
+
+
+def _download(url, progress, *, allow_redirects=True):
+    import httpx
+
+    progress("download")
+    with httpx.Client(timeout=10) as client:
+        for _ in range(6):
+            with client.stream("GET", _validate_public_url(url)) as response:
+                progress("response_headers")
+                if response.has_redirect_location:
+                    if not allow_redirects:
+                        raise ValueError("期刊文章地址发生重定向")
+                    url = str(response.url.join(response.headers["location"]))
+                    continue
+                data = bytearray()
+                if response.status_code == 200:
+                    declared = response.headers.get("content-length", "")
+                    if declared.isdecimal() and int(declared) > PDF_MAX_BYTES:
+                        raise SourceTooLarge()
+                    for chunk in response.iter_bytes(chunk_size=65536):
+                        if len(data) + len(chunk) > PDF_MAX_BYTES:
+                            raise SourceTooLarge()
+                        data.extend(chunk)
+                progress("download_complete")
+                return SimpleNamespace(data=bytes(data), status=response.status_code, headers=response.headers)
+    raise ValueError("重定向次数超限")
+
+
+def _article_page(url):
+    parsed = urlparse(url)
+    match = re.fullmatch(r"/articles/(\d+)/(\d+)/(\d+)/([a-z]+)-\1-\2-\3\.pdf", parsed.path)
+    if match and parsed.netloc == f"{match[4]}.copernicus.org":
+        return f"https://{parsed.netloc}/articles/{match[1]}/{match[2]}/{match[3]}/"
+    return None
+
+
+def _source_worker(url, progress_path):
+    with open(progress_path, "a", encoding="utf-8", buffering=1) as log:
+        def progress(stage):
+            print(stage, file=log, flush=True)
+
+        def read(address, *, allow_redirects=True):
+            return read_public_source(address, fetch=lambda target: _download(
+                target, progress, allow_redirects=allow_redirects), progress=progress)
+
+        result = read(url)
+        article = _article_page(url)
+        if article and result["status"] != "success":
+            progress("html_fallback")
+            fallback = read(article, allow_redirects=False)
+            if fallback["status"] == "success" and fallback["source"]["type"] == "web":
+                fallback["original_pdf_url"] = url
+                result = fallback
+        print(json.dumps(result), flush=True)
+
+
+def _read_with_deadline(url):
+    try:
+        url = _validate_public_url(url)
+    except ValueError as error:
+        return {"status": "error", "tool": "read_source", "url": url, "message": str(error)}
+    cancelled, publish = _read_context.get() or (lambda: False, lambda event: None)
+    started = monotonic()
+    stage = "worker_start"
+
+    def emit(next_stage):
+        publish({"node": "service", "event": "source_read", "url": url, "stage": next_stage,
+                 "duration_ms": round((monotonic() - started) * 1000),
+                 "timestamp": datetime.now(UTC).isoformat(), "detail": f"正文读取阶段：{next_stage}"})
+
+    code = "from atmospheric_research_agent.agent.tools.source_reader import _source_worker; import sys; _source_worker(*sys.argv[1:])"
+    with TemporaryDirectory() as directory:
+        progress = Path(directory) / "progress"
+        progress.touch()
+        with (Path(directory) / "result").open("w+b") as output:
+            with subprocess.Popen([sys.executable, "-c", code, url, str(progress)], stdout=output,
+                                  stderr=subprocess.DEVNULL) as worker:
+                seen = 0
+                try:
+                    while True:
+                        if cancelled():
+                            raise RuntimeError("服务关停，正文读取已取消。")
+                        stages = progress.read_text(encoding="utf-8").splitlines()
+                        for stage in stages[seen:]:
+                            emit(stage)
+                        seen = len(stages)
+                        if worker.poll() is not None:
+                            output.seek(0)
+                            try:
+                                result = json.load(output)
+                            except ValueError:
+                                break
+                            emit("completed" if result["status"] == "success" else "failed")
+                            return result
+                        if monotonic() - started >= SOURCE_TIMEOUT_SECONDS:
+                            emit("timeout")
+                            return {"status": "error", "tool": "read_source", "url": url,
+                                    "message": f"正文读取超过 {SOURCE_TIMEOUT_SECONDS} 秒。",
+                                    "diagnostics": {"stage": stage}}
+                        try:
+                            worker.wait(timeout=0.1)
+                        except subprocess.TimeoutExpired:
+                            pass
+                finally:
+                    if worker.poll() is None:
+                        worker.kill()
+    emit("failed")
+    return {"status": "error", "tool": "read_source", "url": url, "message": "正文读取子进程未返回结果。"}
+
+
 @tool
 def read_source(url: str) -> dict[str, Any]:
     """读取已发现的公开 HTML 网页或有文字层 PDF，提取正文及来源信息。
@@ -201,4 +346,4 @@ def read_source(url: str) -> dict[str, Any]:
     PDF 有大小、页数和字符限制；截断时会说明范围，不支持扫描版 OCR。
     """
 
-    return read_public_source(url)
+    return _read_with_deadline(url)

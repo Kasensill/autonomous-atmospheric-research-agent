@@ -31,7 +31,7 @@ def fake_reader(monkeypatch, *, data=b"<html>private body</html>", headers=None,
             raise extract_error
         return content
 
-    def parse_pdf(data, url, diagnostics):
+    def parse_pdf(data, url, diagnostics, *, isolated=False):
         calls.append("pdf")
         return {"status": "error", "tool": "read_source", "url": url,
                 "message": "PDF 离线解析失败", "diagnostics": diagnostics}

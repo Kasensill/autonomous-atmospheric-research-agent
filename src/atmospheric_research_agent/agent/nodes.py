@@ -23,6 +23,7 @@ from langgraph.types import interrupt
 from .settings import (
     DEFAULT_DEEPSEEK_BASE_URL,
     DEFAULT_DEEPSEEK_MODEL,
+    MODEL_REQUEST_TIMEOUT_SECONDS,
     MAX_REPORT_REVISION_ROUNDS,
     MAX_RESEARCH_ROUNDS,
     MAX_TOOL_CALLS,
@@ -32,6 +33,7 @@ from .settings import (
     MAX_CLARIFICATIONS,
     clarifications_exhausted,
 )
+from .model_trace import model_trace_options
 from .memory import make_memory_record, recall_project_memory, save_project_memory, is_time_sensitive_question
 from .state import (
     EvidenceAssessment,
@@ -157,25 +159,39 @@ class ReportReviewOutput(BaseModel):
 
 
 def _create_base_model(*, thinking: Literal["disabled", "enabled"] = "disabled") -> ChatOpenAI:
-    """创建共享的 DeepSeek 模型客户端，但不赋予任何研究工具。
-
-    Agent 的多轮工具调用明确关闭 DeepSeek thinking mode。该模式要求每一轮
-    原样回传隐藏的 ``reasoning_content``；当前 LangChain/OpenAI 消息适配层
-    不能可靠保留该 DeepSeek 专有字段。研究路径本身由 State、工具结果、
-    条件边和程序预算显式记录，因此不依赖隐藏思维链。
-    """
+    """创建研究模型客户端，工具绑定由调用方处理。"""
 
     load_dotenv()
-    api_key = os.getenv("DEEPSEEK_API_KEY")
+    provider = os.getenv("RESEARCH_MODEL_PROVIDER", "deepseek").strip().lower()
+    if provider == "qwen":
+        key_name = "DASHSCOPE_API_KEY"
+        model = os.getenv("QWEN_MODEL", "qwen3.8-flash")
+        base_url = os.getenv("QWEN_BASE_URL", "https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1")
+        extra_body = {"enable_thinking": thinking == "enabled"}
+        options = {"streaming": True} if thinking == "enabled" else {}
+    elif provider == "deepseek":
+        key_name = "DEEPSEEK_API_KEY"
+        model = os.getenv("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL)
+        base_url = os.getenv("DEEPSEEK_BASE_URL", DEFAULT_DEEPSEEK_BASE_URL)
+        extra_body = {"thinking": {"type": thinking}}
+        options = {}
+    else:
+        raise ValueError("RESEARCH_MODEL_PROVIDER 仅允许 qwen 或 deepseek。")
+    api_key = os.getenv(key_name)
     if not api_key:
-        raise RuntimeError("未配置 DEEPSEEK_API_KEY；请在项目根目录的 .env 中设置它。")
+        raise RuntimeError(f"未配置 {key_name}；请在项目根目录的 .env 中设置它。")
 
     return ChatOpenAI(
-        model=os.getenv("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL),
+        model=model,
         api_key=api_key,
-        base_url=os.getenv("DEEPSEEK_BASE_URL", DEFAULT_DEEPSEEK_BASE_URL),
+        base_url=base_url,
         temperature=0,
-        extra_body={"thinking": {"type": thinking}},
+        timeout=MODEL_REQUEST_TIMEOUT_SECONDS,
+        max_retries=0,
+        http_socket_options=(),
+        **model_trace_options(MODEL_REQUEST_TIMEOUT_SECONDS),
+        extra_body=extra_body,
+        **options,
     )
 
 
@@ -721,6 +737,8 @@ def _evidence_from_tool_message(
             record["author_or_organization"] = source["organization"]
         if source.get("published_at"):
             record["published_or_observed_at"] = source["published_at"]
+        if result.get("original_pdf_url"):
+            record["original_pdf_url"] = result["original_pdf_url"]
         return [record], "从网页正文整理了 1 条证据。", "evidence_extracted"
     return [], f"工具 {message.name} 的证据整理规则尚未实现。", "tool_result_unhandled"
 

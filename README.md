@@ -198,7 +198,7 @@ flowchart TD
 - `search_web(query)`：通过 Tavily 寻找公开网页候选；候选摘要不是正式证据。
 - `read_source(url)`：读取候选网页正文与可获得的标题、机构、作者、日期。
 
-`read_source` 支持有文字层的 PDF（有页数、大小、字符上限），不做 OCR；限制与失败提示见架构文档的 PDF 一节。
+`read_source` 在可终止的子进程内下载并解析 HTML 或文字层 PDF，每个 URL 共用 30 秒预算，下载上限为 10 MiB。匹配 Copernicus 期刊文章地址的 PDF 读取失败时，会在剩余预算内尝试同篇 HTML。后端关停会终止正在读取的来源，并保留任务的中断状态。见[来源读取机制](docs/architecture/research_workflow.md#read_sourcehtml-与文字层-pdf)和[本地服务说明](docs/architecture/local_service.md)。
 
 只有本地知识片段、天气规范化结果和实际读取到的网页正文会写入 `evidence`。网页搜索
 结果仅供 Agent 选择下一步读取哪些 URL。
@@ -241,7 +241,7 @@ TAVILY_API_KEY=               # 公开网页搜索；不使用网页搜索时可
 上限、本地检索 Top-K、网页读取长度和网络超时。离线入库的分块参数留在
 `ingestion/build_index.py`，因为它是独立的数据准备流程。
 
-DeepSeek 的 Agent Tool Calling 明确关闭思考模式：该 API 模式要求每轮回传专有的
+研究模型默认使用 DeepSeek，设置 `RESEARCH_MODEL_PROVIDER=qwen` 可启用千问，复用 `DASHSCOPE_API_KEY`。DeepSeek 的 Agent Tool Calling 明确关闭思考模式：该 API 模式要求每轮回传专有的
 `reasoning_content`，而项目以可审阅的 State、工具结果与节点轨迹记录研究过程，不依赖
 隐藏思维链。
 

@@ -34,6 +34,7 @@ class ResearchPlan(TypedDict, total=False):
 
 
 class EvidenceRecord(TypedDict, total=False):
+    original_pdf_url: str
     """已被整理为可用于报告的证据条目。"""
 
     # 程序根据来源与正文生成的稳定 ID；报告中的 [E1] 等编号由它排序得来。

@@ -5,8 +5,45 @@ import subprocess
 import sys
 from time import monotonic
 from types import SimpleNamespace
+from threading import Event, Thread
 
 from atmospheric_research_agent.agent.tools import pdf_reader, source_reader
+from atmospheric_research_agent.service.manager import RunManager
+
+
+def test_shutdown_cancels_source_worker(tmp_path, monkeypatch):
+    real_popen = subprocess.Popen
+    entered = Event()
+    children = []
+
+    def start_worker(command, **options):
+        script = ("import sys,time; "
+                  "open(sys.argv[1], 'w').write('parse_pdf\\n'); time.sleep(30)")
+        child = real_popen([sys.executable, "-c", script, command[-1]], **options)
+        children.append(child)
+        return child
+
+    monkeypatch.setattr(source_reader.subprocess, "Popen", start_worker)
+    manager = RunManager(db_path=tmp_path / "runs.sqlite3")
+
+    def read():
+        with source_reader.source_read_scope(lambda: manager._closed,
+                                             lambda e: entered.set() if e["stage"] == "parse_pdf" else None):
+            source_reader._read_with_deadline("https://example.org/article.pdf")
+
+    pending = manager._executor.submit(read)
+    closer = Thread(target=manager.close)
+    try:
+        assert entered.wait(5)
+        closer.start()
+        closer.join(5)
+        assert not closer.is_alive()
+        assert children[0].poll() is not None
+        assert "正文读取已取消" in str(pending.exception(timeout=1))
+    finally:
+        manager.close()
+        if closer.ident is not None:
+            closer.join()
 
 
 def test_missing_pypdf_is_a_diagnostic_tool_error(monkeypatch):
