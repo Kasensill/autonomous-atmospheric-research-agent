@@ -327,7 +327,8 @@ def test_streamlit_restarted_history_pagination_and_interruption(tmp_path, monke
         next(b for b in app.button if b.label.startswith('执行中断 ·')).click().run()
         assert not app.exception
         assert any(m.value == '执行中断' for m in app.metric)
-        assert not any(b.label in {'继续研究', '提交回答，继续原任务'} for b in app.button)
+        assert next(b for b in app.button if b.label == '继续研究').disabled
+        assert not any(b.label == '提交回答，继续原任务' for b in app.button)
         next(b for b in app.button if b.label == '下一页').click().run()
         assert not app.exception and app.session_state['history_offset'] == 20
         assert any(b.label.endswith('历史0') for b in app.button)

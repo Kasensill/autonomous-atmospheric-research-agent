@@ -28,7 +28,7 @@
 
 ### 同任务追问恢复与可观测性
 
-缺少关键信息时暂停追问，回答后在同一任务内保留状态与预算恢复，减少重新开始造成的重复取证。每次运行记录节点级 Trace，debug 模式实时追加节点序列；检查点仅在进程内有效，实时日志不等于可跨进程恢复。见[同任务暂停与恢复](docs/architecture/HITL_minimal.md)与[诊断材料](docs/architecture/research_workflow.md#--debug-诊断材料)。
+缺少关键信息时暂停追问，回答后在同一任务内保留状态与预算恢复，减少重新开始造成的重复取证。每次运行记录节点级 Trace，debug 模式实时追加节点序列；CLI 检查点保留在进程内，FastAPI 使用 SQLite 检查点支持跨进程恢复。见[同任务暂停与恢复](docs/architecture/HITL_minimal.md)与[诊断材料](docs/architecture/research_workflow.md#--debug-诊断材料)。
 
 ## 一个真实排错案例
 
@@ -91,7 +91,7 @@ py -3.11 -m venv .venv
 
 界面展示报告、证据、核验和 Trace，可下载 Markdown 与 JSON；支持上传 TXT、MD、文字型 PDF，并选择材料用途，追问恢复复用原材料。凭据在服务端本地 `.env` 配置，开始研究会调用配置的 API 并可能产生费用。报告完成后可继续提问，复用材料与有限历史背景，每轮独立取证和计算预算，见[本地服务说明](docs/architecture/local_service.md)。本版不支持 OCR 或多模态。
 
-这是单用户、单worker、无排队的本地服务，一次只接收一个未结束任务。历史任务保存在本地 SQLite，页面刷新或服务重启后可查看历史报告并复用材料继续提问；未结束任务在重启后标为“执行中断”，不自动重跑。可放弃等待中的任务，不支持强停运行中的任务；底层调用卡死时可能需要重启。长期记忆仍共用本地文件，不提供多用户隔离。接口契约、错误、记录保留与测试边界见[本地服务说明](docs/architecture/local_service.md)。离线接口测试不等于真实网络与模型端到端验收。
+这是单用户、单worker、无排队的本地服务，一次只接收一个未结束任务。历史任务保存在本地 SQLite，页面刷新或服务重启后可查看历史报告并复用材料继续提问；未结束任务在重启后标为“执行中断”。有检查点时，点击「继续研究」可续跑原任务。可放弃等待中的任务，不支持强停运行中的任务；底层调用卡死时可能需要重启。长期记忆仍共用本地文件，不提供多用户隔离。接口契约、错误、记录保留与测试边界见[本地服务说明](docs/architecture/local_service.md)。离线接口测试不等于真实网络与模型端到端验收。
 
 ## 完整流程图
 
@@ -113,7 +113,10 @@ py -3.11 -m venv .venv
 flowchart TD
     __start__(["开始（__start__）"])
     recall_memory["召回背景（recall_memory）"]
-    agent["研究决策（agent）<br/>先处理 ask_user"]
+    agent["研究决策（agent）<br/>区分历史查询与新研究"]
+    lookup_history["查询 SQLite 档案"]
+    answer_history["交付历史回答"]
+    history_end(["历史查询结束"])
     tools["工具执行（tools）"]
     record_results["整理证据与计数<br/>（record_results）"]
     research_guard{"证据守卫<br/>（research_guard）"}
@@ -124,13 +127,19 @@ flowchart TD
 
     __start__ --> recall_memory
     recall_memory --> agent
+    agent -->|"提交历史查询请求"| lookup_history
+    lookup_history -->|"纯查历史或结果有歧义"| research_guard
+    lookup_history -->|"为新研究返回候选片段"| agent
     agent -->|"有效追问，额度未满"| request_clarification
     agent -->|"无待追问；普通请求整批可执行"| tools
     agent -->|"无普通请求或批次预算不足"| research_guard
     tools --> record_results
     record_results --> agent
     request_clarification -->|"用户回答，预算保留"| agent
-    research_guard -->|"有可用证据"| assess_evidence
+    research_guard -->|"历史目标有歧义且有澄清额度"| request_clarification
+    research_guard -->|"历史回顾、未找到或歧义未解"| answer_history
+    answer_history --> history_end
+    research_guard -->|"新研究有可用证据"| assess_evidence
     research_guard -->|"无证据；明确停研、澄清已满或预算耗尽"| finalize_limited_report
     research_guard -->|"无证据；两类额度均未满"| agent
     assess_evidence -->|"clarify，额度未满"| request_clarification
@@ -156,7 +165,7 @@ flowchart TD
     revise_report["修订必须修改项<br/>（revise_report）"]
     finalize_report["定稿并附来源（finalize_report）<br/>limited 加受限提示"]
     finalize_limited_report["失败说明（finalize_limited_report）<br/>不交付未核验草稿；不存记忆"]
-    store_memory["保存或跳过记忆（store_memory）<br/>仅 full、核验通过且非时效性任务写入<br/>limited 不写入"]
+    store_memory["保存或跳过记忆（store_memory）<br/>仅 full、核验通过、无用户材料且非时效性任务写入<br/>limited 不写入"]
     __end__(["结束（__end__）"])
 
     generate_draft --> verify_report
@@ -275,7 +284,7 @@ DeepSeek 的 Agent Tool Calling 明确关闭思考模式：该 API 模式要求�
 正式模块入口也支持追问后继续：缺少地点等必要信息时会在当前终端等待回答，不需要重新发起任务。
 HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command(resume=...)`。
 恢复保留证据、消息、记忆、研究轮次与工具计数；回答追加到消息和澄清记录，传给评估、写作与核验。
-人工等待时间不计入执行耗时。退出进程后不能恢复执行中的图；FastAPI 已用 SQLite 保存历史任务，可重启后查看已完成结果并创建新一轮研究。尚未加入前置意图节点或旧证据自动筛选。
+人工等待时间不计入执行耗时。CLI 退出后原检查点失效。FastAPI 可凭 SQLite 检查点恢复原任务，也可以查看已完成结果并创建新一轮研究。尚未加入前置意图节点或旧证据自动筛选。
 设计与验证详情见 [最小 HITL 说明](docs/architecture/HITL_minimal.md)。
 
 只使用内部知识库：
@@ -323,7 +332,7 @@ HITL 使用 `InMemorySaver`、不变的 `thread_id`、`interrupt()` 和 `Command
   CLI 可本地读取，服务端 Trace 已纳入 SQLite 任务档案；尚未接入监控平台、告警或成本仪表盘。
 - 网页正文读取具有 V1 基础的 URL 安全过滤；不等于生产级的全量 SSRF 防护。
 - 当前 Task Memory 只保存已通过核验报告的项目摘要，并按轻量词项召回；它是跨运行背景，绝不是
-  本次可引用的正式 evidence，也尚未实现数据库或跨用户隔离。任务恢复另由内存检查点负责，不能跨进程。
+  本次可引用的正式 evidence，也尚未实现数据库或跨用户隔离。FastAPI 的任务恢复另由 SQLite 执行检查点负责。
 
 ### 历史修复与质量验证
 
@@ -357,7 +366,7 @@ MCP、FastAPI、Docker 与前端属于服务和产品交付层：它们会复用
 它们不是另一套脱离基础的知识，而是把同样的 State、节点、边、工具与评测能力扩展到更可靠的生产系统。
 
 - **评测与可观测性**：固定问题集、期望证据、检索与报告质量指标、耗时和成本记录；不能只凭单次回答观感判断质量。
-- **持久化与可恢复运行**：将 State、检查点、研究记录写入数据库，使中断任务可以从最近节点恢复。
+- **持久化与可恢复运行**：本地 FastAPI 已保存任务档案和 LangGraph 检查点，支持重启后手动恢复。
 - **Human-in-the-loop**：在关键来源、研究计划或最终结论处暂停，等待人工确认后继续。
 - **可靠工具系统**：权限分级、参数校验、超时、重试、幂等性与沙箱；工具开始涉及文件、代码或外部写操作时尤其关键。
 - **长期与异步任务**：以后台任务、队列和进度状态支持分钟到小时级研究，并允许查看、取消和恢复。

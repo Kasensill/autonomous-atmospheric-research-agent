@@ -6,6 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from datetime import UTC, datetime
 import logging
+import sqlite3
 from threading import RLock
 from pathlib import Path
 import traceback
@@ -14,6 +15,8 @@ from uuid import uuid4
 
 from ..agent.settings import MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
 from .engine import ResearchSession
+from ..agent.history import HistoryContext, archived_history
+from ..agent.settings import HISTORY_ARCHIVE_SCAN_LIMIT
 from .storage import SQLiteRunStore
 from .uploads import MaterialUpload, UploadStore, upload_fingerprint, validate_uploads
 
@@ -66,6 +69,7 @@ class RunRecord:
     parent_run_id: str | None = None
     conversation_context: list = field(default_factory=list)
     material_snapshot: dict | None = None
+    resume_count: int = 0
 
 
 class RunManager:
@@ -83,12 +87,25 @@ class RunManager:
         self._closed = False
         self._storage_failed = False
         self._store_closed = False
+        self._closing = False
+        self._checkpoint_conn = None
+        self._checkpointer = None
         try:
             self._store = SQLiteRunStore(db_path)
+            if str(db_path) != ':memory:' and session_factory is ResearchSession:
+                from langgraph.checkpoint.sqlite import SqliteSaver
+                from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+                path = Path(db_path).resolve()
+                self._checkpoint_conn = sqlite3.connect(path.with_suffix(path.suffix + '.checkpoints'),
+                                                        check_same_thread=False)
+                self._checkpointer = SqliteSaver(self._checkpoint_conn, serde=JsonPlusSerializer(allowed_msgpack_modules=None))
+                self._checkpointer.setup()
             for payload in self._store.unfinished():
                 record = RunRecord(**payload)
                 self._interrupt(record)
         except Exception as error:
+            if self._checkpoint_conn is not None:
+                self._checkpoint_conn.close()
             if hasattr(self, '_store'):
                 self._store.close()
             LOGGER.error('storage_startup_error type=%s', type(error).__name__)
@@ -144,7 +161,7 @@ class RunManager:
         record.delivery_type = None
         record.clarification = None
         record.error = {'code': 'execution_interrupted',
-                        'message': '研究执行中断：服务已停止或重启，未自动恢复或重跑。请新建研究。',
+                        'message': '研究执行中断：服务已停止或重启，可用的执行检查点将保留。',
                         'run_id': record.run_id, 'error_id': None}
         record.state['finished_at'] = now()
         record.state.pop('final_report', None)
@@ -157,6 +174,8 @@ class RunManager:
             'run_id':record.run_id,'question':record.question,'status':record.status,
             'conversation_id':record.conversation_id or record.run_id, 'parent_run_id':record.parent_run_id,
             'delivery_type':record.delivery_type,'version':record.version,'updated_at':record.updated_at,
+            'resume_count': record.resume_count,
+            'can_resume': record.status == 'interrupted' and self._has_checkpoint(record.run_id),
             'clarification':record.clarification,'error':record.error,'elapsed_ms':record.elapsed_ms,
             'research_round':record.state.get('research_round',0),
             'tool_call_count':record.state.get('tool_call_count',0),
@@ -277,6 +296,67 @@ class RunManager:
             raise ServiceError(503,'service_unavailable','无法安排研究执行。',record.run_id,
                                record.error['error_id']) from None
 
+    def _has_checkpoint(self, run_id: str) -> bool:
+        if self._checkpointer is None or self._store_closed:
+            return False
+        try:
+            return self._checkpointer.get_tuple({'configurable': {'thread_id': run_id}}) is not None
+        except Exception as error:
+            LOGGER.warning('checkpoint_read_error run_id=%s type=%s', run_id, type(error).__name__)
+            return False
+
+    def _history_context(self, record: RunRecord) -> HistoryContext:
+        def lookup(request: dict, state: dict) -> dict:
+            target = request["target"]
+            target_id = request["value"].lower() if target == "run_id" else None
+            if target == "latest" and record.parent_run_id:
+                target_id = record.parent_run_id
+            scope = record.conversation_id if record.parent_run_id and target != "run_id" else None
+            with self._lock:
+                try:
+                    rows = self._store.history_before(record.run_id, HISTORY_ARCHIVE_SCAN_LIMIT,
+                                                      conversation_id=scope, target_id=target_id,
+                                                      completed_reports=request["purpose"] == "answer_history"
+                                                      or target == "latest")
+                except (sqlite3.Error, ValueError) as error:
+                    raise self._storage_error(error) from None
+            return archived_history(request, state, rows, parent_run_id=record.parent_run_id)
+        return HistoryContext(lookup)
+
+    def resume(self, run_id: str) -> dict:
+        with self._lock:
+            self._ensure_open()
+            record = self._record(run_id)
+            if record.status != 'interrupted':
+                raise ServiceError(409, 'resume_conflict', '任务当前无法继续执行。', run_id)
+            if self._active is not None:
+                raise ServiceError(409, 'task_busy', '请先结束当前任务。', self._active)
+            if not self._has_checkpoint(run_id):
+                raise ServiceError(409, 'checkpoint_missing', '这项任务没有可用的执行检查点。', run_id)
+            session = ResearchSession(record.question, run_id=run_id, checkpointer=self._checkpointer)
+            session.history_context = self._history_context(record)
+            try:
+                session.restore()
+            except ValueError:
+                session.close()
+                raise ServiceError(409, 'checkpoint_unusable', '执行检查点无法继续。', run_id) from None
+            session.elapsed_ms = record.elapsed_ms
+            if run_id not in self._records:
+                self._prune()
+            record.resume_count += 1
+            record.engine = session
+            record.error = None
+            record.clarification = None
+            record.status = 'running'
+            # 从图检查点重新对齐节点轨迹，保留服务侧中断记录。
+            record.trace = [*session.state.get('trace', []),
+                            *(item for item in record.trace if item.get('node') == 'service')]
+            self._publish(record, session.state)
+            self._records[run_id] = record
+            self._active = run_id
+            self._submit(record, None)
+            return self._view(record)
+
     def answer(self, run_id: str, question_id: str, answer: str) -> dict:
         if not isinstance(answer,str) or not answer.strip() or len(answer)>10000:
             raise ServiceError(422,'invalid_request','回答必须为非空文本且不超过长度限制。',run_id)
@@ -294,9 +374,16 @@ class RunManager:
     def _publish(self, record: RunRecord, state: dict) -> None:
         with self._lock:
             if record.status == 'interrupted':
+                if self._checkpointer is not None:
+                    raise RuntimeError('服务已停止')
                 return
             record.state=deepcopy({k:v for k,v in state.items() if k in PUBLIC_FIELDS})
-            record.trace=deepcopy(state.get('trace',[]))
+            graph_trace = state.get('trace', [])
+            if record.resume_count:
+                previous_count = sum(item.get('node') != 'service' for item in record.trace)
+                record.trace.extend(deepcopy(graph_trace[previous_count:]))
+            else:
+                record.trace = deepcopy(graph_trace)
             self._touch(record)
 
     def _fail(self, record: RunRecord, error: Exception) -> None:
@@ -338,13 +425,19 @@ class RunManager:
                 if record.parent_run_id:
                     options.update(material_snapshot=record.material_snapshot, material_role=record.material_role,
                                    conversation_context=record.conversation_context)
+                if self._checkpointer is not None:
+                    options["checkpointer"] = self._checkpointer
                 record.engine=self._factory(record.question,run_id=record.run_id,on_error=observed_errors.append, **options)
+                if isinstance(record.engine, ResearchSession):
+                    record.engine.history_context = self._history_context(record)
             with self._lock:
                 if record.status == 'interrupted':
                     self._release(record)
                     return
             record.engine.on_error=observed_errors.append
-            record.engine.advance(answer,on_progress=lambda state:self._publish(record,state))
+            # 恢复到已有人工中断或已完成的检查点时，直接发布状态。
+            if answer is not None or record.engine.status not in {'waiting', 'completed'}:
+                record.engine.advance(answer,on_progress=lambda state:self._publish(record,state))
             with self._lock:
                 if record.status == 'interrupted':
                     self._release(record)
@@ -358,7 +451,8 @@ class RunManager:
                     record.clarification={'question_id':str(uuid4()),'question':record.engine.question}
                 elif record.engine.status=='completed':
                     record.status='completed'
-                    record.delivery_type=('failure_notice' if any(t.get('node')=='finalize_limited_report'
+                    record.delivery_type=('history_answer' if any(t.get('node') == 'answer_history' for t in record.trace)
+                        else 'failure_notice' if any(t.get('node')=='finalize_limited_report'
                         for t in record.trace) else 'limited_report' if record.state.get('report_mode')=='limited'
                         else 'full_report')
                     self._release(record)
@@ -405,18 +499,22 @@ class RunManager:
 
     def close(self) -> None:
         with self._lock:
-            if self._store_closed:
+            if self._store_closed or self._closing:
                 return
-            self._closed=True
-            try:
+            self._closing = True
+            self._closed = True
+        try:
+            with self._lock:
                 for record in self._records.values():
                     if record.status in {'running', 'waiting_user'}:
                         waiting = record.status == 'waiting_user'
                         self._interrupt(record)
                         if waiting:
                             self._release(record)
-            finally:
+        finally:
+            self._executor.shutdown(wait=self._checkpointer is not None, cancel_futures=False)
+            with self._lock:
+                if self._checkpoint_conn is not None:
+                    self._checkpoint_conn.close()
                 self._store.close()
                 self._store_closed = True
-                # 运行中的底层调用无法硬取消；晚到结果不得覆盖已保存的中断状态。
-                self._executor.shutdown(wait=False, cancel_futures=False)

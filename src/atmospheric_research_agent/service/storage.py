@@ -83,6 +83,23 @@ class SQLiteRunStore:
         with self._lock:
             return [json.loads(row[0]) for row in self._connection.execute(query, (*args, limit, offset))]
 
+    def history_before(self, current_id: str, limit: int, *, conversation_id: str | None = None,
+                       target_id: str | None = None, completed_reports: bool = False) -> list[dict]:
+        query = "SELECT payload FROM runs WHERE rowid < (SELECT rowid FROM runs WHERE run_id=?)"
+        args = [current_id]
+        if completed_reports:
+            query += (" AND status='completed' AND "
+                      "json_extract(payload, '$.delivery_type') IN ('full_report','limited_report')")
+        if conversation_id is not None:
+            query += " AND conversation_id=?"
+            args.append(conversation_id)
+        if target_id is not None:
+            query += " AND run_id=?"
+            args.append(target_id)
+        with self._lock:
+            return [json.loads(row[0]) for row in self._connection.execute(
+                query + " ORDER BY rowid DESC LIMIT ?", (*args, limit))]
+
     def unfinished(self) -> list[dict]:
         with self._lock:
             return [json.loads(row[0]) for row in self._connection.execute(

@@ -237,8 +237,8 @@ def test_review_failure_keeps_material_coverage_but_does_not_deliver_draft(tmp_p
     assert "不交付的坏草稿" not in result["final_report"]
 
 
-def test_graph_edges_and_existing_limits_are_unchanged():
-    # 材料只改变现有分支的判定，不新增节点或连线。
+def test_materials_keep_existing_graph_edges_with_explicit_history_routes():
+    # 材料沿用原研究分支，独立历史功能只增加下列明确的边。
     edges = {(edge.source, edge.target) for edge in graph_module.build_research_graph().get_graph().edges}
     assert edges == {
         ("__start__", "recall_memory"), ("recall_memory", "agent"),
@@ -250,4 +250,7 @@ def test_graph_edges_and_existing_limits_are_unchanged():
         ("verify_report", "revise_report"), ("verify_report", "finalize_limited_report"),
         ("revise_report", "verify_report"), ("finalize_report", "store_memory"),
         ("store_memory", "__end__"), ("finalize_limited_report", "__end__"), ("request_clarification", "agent"),
+        ("agent", "lookup_history"), ("lookup_history", "research_guard"), ("lookup_history", "agent"),
+        ("research_guard", "answer_history"), ("research_guard", "request_clarification"),
+        ("answer_history", "__end__"),
     }

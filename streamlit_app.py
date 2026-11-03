@@ -76,7 +76,9 @@ def render_results(task: RemoteResearchTask) -> None:
     report, evidence, material_tab = st.tabs(["研究报告", "证据与核验", "材料与覆盖"])
     with report:
         if task.status == "completed":
-            if task.ending == "失败说明":
+            if task.ending == "历史回答":
+                st.info("以下内容来自历史档案或项目记忆。")
+            elif task.ending == "失败说明":
                 st.warning("本次未形成可交付的研究报告，下面是失败说明。")
             elif task.ending == "受限报告":
                 st.warning("证据不完整，只交付可支持的部分；受限报告不写入长期记忆。")
@@ -100,6 +102,8 @@ def render_results(task: RemoteResearchTask) -> None:
         for index, record in enumerate(state.get("evidence", []), 1):
             with st.expander(f"E{index} · {record.get('source_display_name', '未命名来源')}"):
                 st.text(record.get("source_location", ""))
+                if record.get("historical_run_id"):
+                    st.caption(f"复用自历史任务 {record['historical_run_id']} · 档案条目 #{record['historical_evidence_index']}")
                 if record.get('source_type') == 'user_material':
                     st.caption(f"用户提供、未独立核实 · {record.get('locator', '')}")
                 st.caption(f"有效时间：{record.get('valid_at') or '未提供／不适用'}")
@@ -304,6 +308,28 @@ def main() -> None:
     if task.view.get('material_files'):
         st.write('本任务材料：', '、'.join(task.view['material_files']))
         st.caption('追问后继续使用同一批材料；如需更换材料，请新建研究。')
+    if task.status in {"interrupted", "suspended"}:
+        can_resume = task.view.get("can_resume", False)
+        with st.container(key="resume_research"):
+            st.markdown("""<style>
+                .st-key-resume_research button[kind="primary"]:enabled {
+                    background-color: #15803d; border-color: #15803d; color: white;
+                }
+                </style>""", unsafe_allow_html=True)
+            action = st.empty()
+            if action.button("继续研究", type="primary", disabled=not service_ok or not can_resume):
+                action.button("正在继续研究…", type="primary", disabled=True)
+                try:
+                    with st.spinner("正在读取执行检查点…"):
+                        view = client.resume(task.state["run_id"])
+                    st.session_state["research_task"] = RemoteResearchTask(client, view)
+                    st.rerun()
+                except ApiError as error:
+                    st.error(str(error))
+                    action.empty()
+                    st.button("刷新任务状态", key="refresh_resume")
+            if not can_resume:
+                st.caption("这项任务没有可用的执行检查点，可以查看历史记录。")
     if task.status == "running":
         st.info("服务端正在研究。")
         render_progress(task.state, st.empty(), st.empty())

@@ -63,6 +63,9 @@ class ResearchClient:
     def answer(self, run_id: str, question_id: str, answer: str):
         return self.request('POST',f'/runs/{run_id}/answers',json={'question_id':question_id,'answer':answer})
 
+    def resume(self, run_id: str):
+        return self.request('POST', f'/runs/{run_id}/resume')
+
     def abandon(self, run_id: str):
         return self.request('POST',f'/runs/{run_id}/abandon')
 
@@ -91,6 +94,9 @@ class RemoteResearchTask:
     def refresh(self):
         view=self.client.get(self.state['run_id'])
         changed=view['version']!=self.view['version']
+        if view.get('resume_count', 0) != self.view.get('resume_count', 0):
+            self._trace_after = 0
+            self.state.pop('trace', None)
         self._apply(view)
         if self.status=='completed' and not self.state.get('final_report'):
             self.state.update(self.client.request('GET',f"/runs/{view['run_id']}/result")['state'])
@@ -115,7 +121,7 @@ class RemoteResearchTask:
         if self.status=='abandoned': return '已放弃'
         if self.status=='waiting': return '等待补充信息'
         if self.status!='completed': return '研究进行中'
-        return {'full_report':'完整报告','limited_report':'受限报告','failure_notice':'失败说明'}[self.view['delivery_type']]
+        return {'full_report':'完整报告','limited_report':'受限报告','failure_notice':'失败说明','history_answer':'历史回答'}[self.view['delivery_type']]
 
     def export_json(self, field: str):
         if field not in {'evidence','trace'}:

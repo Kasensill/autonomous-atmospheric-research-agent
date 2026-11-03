@@ -16,7 +16,13 @@ MAX_TOOL_CALLS = 8
 # 报告阶段 4 + 2 × 2 = 8 步（含两次修订、定稿、store_memory），均为 33 步。
 # 33 × 1.2 = 39.6，取 40；这是兜底保护，不替代研究/工具/修订预算。
 # 修改研究轮次、修订上限或图结构时必须重新核算。
-GRAPH_RECURSION_LIMIT = 40
+# 历史查询最多两次（仅歧义澄清后重查），每次最多增加查询和再决策两步。
+# 普通研究段 33 步 + 4 步 + 历史澄清入口余量 1 步 = 38，按 20% 余量取 46。
+GRAPH_RECURSION_LIMIT = 46
+HISTORY_MAX_LOOKUPS = 2
+HISTORY_MAX_CANDIDATES = 8
+HISTORY_MAX_EXCERPT = 6000
+HISTORY_ARCHIVE_SCAN_LIMIT = 100
 # 报告受控修订预算；避免 Reflection 让图在写作与自检间无限循环。
 MAX_REPORT_REVISION_ROUNDS = 2
 MAX_CLARIFICATIONS = 2

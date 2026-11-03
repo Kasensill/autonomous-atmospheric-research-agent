@@ -38,6 +38,8 @@ class EvidenceRecord(TypedDict, total=False):
 
     # 程序根据来源与正文生成的稳定 ID；报告中的 [E1] 等编号由它排序得来。
     evidence_id: str
+    historical_run_id: str
+    historical_evidence_index: int
     # 本地检索命中的原始切片编号，与本轮报告 E 编号不同。
     chunk_id: str
     # 本次确实可支持报告主张的正文片段，而不是网页搜索摘要。
@@ -173,6 +175,30 @@ class TraceEntry(TypedDict, total=False):
     clarification_quota: dict[str, int]
 
 
+class HistoryRequestState(TypedDict):
+    purpose: Literal["answer_history", "support_research"]
+    target: Literal["latest", "topic", "run_id"]
+    value: str
+    include_evidence: bool
+    list_matches: bool
+
+
+class HistoryResultState(TypedDict, total=False):
+    request: HistoryRequestState
+    status: Literal["matched", "ambiguous", "not_found"]
+    lookup_count: int
+    clarification_count: int
+    run_id: str
+    task_status: str
+    delivery_type: str | None
+    report: str
+    report_truncated: bool
+    memory: ProjectMemoryRecord
+    candidates: list[dict[str, str]]
+    listing: list[dict[str, str]]
+    evidence: list[dict[str, Any]]
+
+
 class ResearchState(TypedDict, total=False):
     """一次研究任务在节点之间流动的全部动态数据。
 
@@ -212,6 +238,8 @@ class ResearchState(TypedDict, total=False):
     # START 后固定读取的历史研究摘要。它不使用 evidence reducer，避免被误认为
     # 本次可引用的正式资料。
     recalled_memories: list[ProjectMemoryRecord]
+    history_request: HistoryRequestState | None
+    history_result: HistoryResultState
 
     # 工具结果与入口材料的可引用记录；材料引用只证明原文，不自动证明外部事实。
     evidence: Annotated[list[EvidenceRecord], add]

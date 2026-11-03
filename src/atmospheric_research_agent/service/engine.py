@@ -13,17 +13,19 @@ from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
 
 from atmospheric_research_agent.agent.graph import build_research_graph
+from atmospheric_research_agent.agent.history import HistoryContext
 from atmospheric_research_agent.agent.settings import GRAPH_RECURSION_LIMIT
 from atmospheric_research_agent.agent.state import create_initial_state
 
 
 class ResearchSession:
-    """由调用方串行驱动；不提供跨进程恢复或硬取消。"""
+    """由调用方串行驱动；支持恢复持久检查点。"""
 
     def __init__(self, question: str, *, run_id: str | None = None,
                  on_error: Callable[[Exception], None] | None = None,
                  material_paths: list[str | Path] | None = None, material_role: str = 'auto',
-                 material_snapshot: dict | None = None, conversation_context: list | None = None) -> None:
+                 material_snapshot: dict | None = None, conversation_context: list | None = None,
+                 checkpointer: Any = None) -> None:
         self.state: dict[str, Any] = dict(create_initial_state(question))
         if run_id is not None:
             self.state["run_id"] = run_id
@@ -50,7 +52,9 @@ class ResearchSession:
                 'detail': '历史仅作背景，不继承旧证据、旧引用或已用预算。',
                 'turn_count': len(conversation_context)})
         self.on_error = on_error
-        self.checkpointer = InMemorySaver()
+        self.history_context: HistoryContext | None = None
+        self._persistent = checkpointer is not None
+        self.checkpointer = checkpointer if self._persistent else InMemorySaver()
         self.graph = build_research_graph(checkpointer=self.checkpointer)
         self.config = {
             "recursion_limit": GRAPH_RECURSION_LIMIT,
@@ -60,6 +64,26 @@ class ResearchSession:
         self.question = ""
         self.error = ""
         self.elapsed_ms = 0.0
+
+    def restore(self) -> None:
+        snapshot = self.graph.get_state(self.config)
+        if not snapshot.values:
+            raise ValueError("找不到执行检查点。")
+        self.state = dict(snapshot.values)
+        interrupts = tuple(item for task in snapshot.tasks for item in task.interrupts)
+        if interrupts:
+            value = interrupts[0].value
+            self.question = value.get("question", "") if isinstance(value, dict) else str(value)
+            if not self.question:
+                raise ValueError("检查点中的澄清问题无效。")
+            self.status = "waiting"
+        elif snapshot.next:
+            self.status = "recovering"
+        elif self.state.get("final_report"):
+            self.status = "completed"
+            self.state["finished_at"] = self.state.get("finished_at") or datetime.now(UTC).isoformat()
+        else:
+            raise ValueError("检查点没有待执行节点或可交付结果。")
 
     def advance(self, answer: str | None = None,
                 on_progress: Callable[[dict[str, Any]], None] | None = None) -> None:
@@ -74,6 +98,8 @@ class ResearchSession:
             payload: Any = Command(resume=answer.strip())
         elif self.status == "ready" and answer is None:
             payload = self.state
+        elif self.status == "recovering" and answer is None:
+            payload = None
         else:
             raise ValueError("当前任务不能再次执行；请新建研究任务。")
 
@@ -83,7 +109,9 @@ class ResearchSession:
         interrupts: tuple = ()
         try:
             # values 是已应用 reducer 的完整状态，不能再手动追加 evidence/trace。
-            for values in self.graph.stream(payload, config=self.config, stream_mode="values"):
+            for values in self.graph.stream(payload, config=self.config, stream_mode="values",
+                                            **({"durability": "sync"} if self._persistent else {}),
+                                            **({"context": self.history_context} if self.history_context else {})):
                 if "__interrupt__" in values:
                     interrupts = tuple(values["__interrupt__"])
                 self.state.update({key: value for key, value in values.items()
@@ -146,6 +174,8 @@ class ResearchSession:
             return "等待补充信息"
         if self.status != "completed":
             return "研究进行中"
+        if any(item.get("node") == "answer_history" for item in self.state.get("trace", [])):
+            return "历史回答"
         if any(item.get("node") == "finalize_limited_report"
                for item in self.state.get("trace", [])):
             return "失败说明"
@@ -158,6 +188,7 @@ class ResearchSession:
                           ensure_ascii=False, indent=2)
 
     def close(self) -> None:
-        """仅在执行结束或暂停时调用，释放所有图检查点。"""
-        self.checkpointer.delete_thread(self.state["run_id"])
+        """仅在执行结束或暂停时调用，释放图引用及内存检查点。"""
+        if not self._persistent:
+            self.checkpointer.delete_thread(self.state["run_id"])
         self.graph = None

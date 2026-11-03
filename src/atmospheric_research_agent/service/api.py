@@ -40,9 +40,11 @@ class RunView(BaseModel):
     run_id: str
     conversation_id: str
     parent_run_id: str | None = None
+    can_resume: bool = False
+    resume_count: int = 0
     question: str
     status: Literal['running','waiting_user','completed','failed','abandoned','interrupted']
-    delivery_type: Literal['full_report','limited_report','failure_notice'] | None
+    delivery_type: Literal['full_report','limited_report','failure_notice','history_answer'] | None
     version: int
     updated_at: str
     clarification: dict | None
@@ -179,6 +181,10 @@ def create_app(manager: RunManager | None=None, *, db_path: str | Path | None = 
                         idempotency_key: Annotated[Key, Header()]):
         return request.app.state.manager.create(body.question, idempotency_key,
                     parent_run_id=str(run_id), material_role=body.material_role)
+
+    @app.post('/runs/{run_id}/resume', status_code=202, response_model=RunView)
+    async def resume(run_id: UUID, request: Request):
+        return request.app.state.manager.resume(str(run_id))
 
     @app.post('/runs/{run_id}/answers',status_code=202,response_model=RunView)
     async def answer(run_id: UUID, body: Answer, request: Request):

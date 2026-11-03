@@ -8,6 +8,7 @@ from time import perf_counter
 from typing import Any, Callable
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.runtime import Runtime
 
 from .nodes import (
     agent_node,
@@ -29,6 +30,7 @@ from .nodes import (
     verify_report_node,
 )
 from .state import ResearchState
+from .history import HistoryContext, lookup_history_node, answer_history_node
 from .resume import ResumeValidatedGraph
 from .evidence import usable_evidence
 from .tools.clarification import ASK_USER_NAME
@@ -75,6 +77,8 @@ def _instrument_node(node_name: str, node: Callable[[ResearchState], dict[str, A
                    "verify_report": route_after_report_verification}
         if node_name in routers:
             merged = {**state, **update}
+            if "evidence" in update and node_name == "agent":
+                merged["evidence"] = [*state.get("evidence", []), *update["evidence"]]
             merged["messages"] = [*state.get("messages", []), *update.get("messages", [])]
             destination = routers[node_name](merged)
             reason = "结构化决策与程序规则"
@@ -166,7 +170,12 @@ def build_research_graph(*, checkpointer: Any = None) -> Any:
     # evidence；assess_evidence 只评估 evidence；草稿、审查与修订都只读取
     # evidence；finalize_report 由程序统一附加来源。
 
-    builder = StateGraph(ResearchState)
+    builder = StateGraph(ResearchState, context_schema=HistoryContext)
+    def lookup_with_trace(state: ResearchState, runtime: Runtime[HistoryContext]) -> dict[str, Any]:
+        return _instrument_node("lookup_history", lambda current: lookup_history_node(current, runtime))(state)
+
+    builder.add_node("lookup_history", lookup_with_trace)
+    builder.add_node("answer_history", _instrument_node("answer_history", answer_history_node))
 
     # 任务记忆：固定在入口读取，不交给模型临时决定；只作背景，不作本轮证据。
     builder.add_node("recall_memory", _instrument_node("recall_memory", recall_memory_node))
@@ -218,10 +227,21 @@ def build_research_graph(*, checkpointer: Any = None) -> Any:
         route_after_agent,
         {
             "tools": "tools",
+            "lookup_history": "lookup_history",
             "request_clarification": "request_clarification",
             "research_guard": "research_guard",
         },
     )
+
+    def after_history_lookup(state: ResearchState) -> str:
+        request, result = state["history_request"], state["history_result"]
+        if request["purpose"] == "answer_history" or result["status"] == "ambiguous":
+            return "research_guard"
+        return "agent"
+
+    builder.add_conditional_edges("lookup_history", after_history_lookup,
+                                  {"research_guard": "research_guard", "agent": "agent"})
+    builder.add_edge("answer_history", END)
 
     # 工具执行后必须先整理证据，再回到 Agent 决定下一轮动作。
     builder.add_edge("tools", "record_results")
@@ -233,6 +253,8 @@ def build_research_graph(*, checkpointer: Any = None) -> Any:
         route_after_research_guard,
         {
             "assess_evidence": "assess_evidence",
+            "answer_history": "answer_history",
+            "request_clarification": "request_clarification",
             "agent": "agent",
             "finalize_limited_report": "finalize_limited_report",
         },

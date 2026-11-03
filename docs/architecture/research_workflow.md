@@ -10,7 +10,10 @@
 flowchart TD
     __start__(["开始（__start__）"])
     recall_memory["召回背景（recall_memory）"]
-    agent["研究决策（agent）<br/>先处理 ask_user"]
+    agent["研究决策（agent）<br/>区分历史查询与新研究"]
+    lookup_history["查询 SQLite 档案"]
+    answer_history["交付历史回答"]
+    history_end(["历史查询结束"])
     tools["工具执行（tools）"]
     record_results["整理证据与计数<br/>（record_results）"]
     research_guard{"证据守卫<br/>（research_guard）"}
@@ -21,13 +24,19 @@ flowchart TD
 
     __start__ --> recall_memory
     recall_memory --> agent
+    agent -->|"提交历史查询请求"| lookup_history
+    lookup_history -->|"纯查历史或结果有歧义"| research_guard
+    lookup_history -->|"为新研究返回候选片段"| agent
     agent -->|"有效追问，额度未满"| request_clarification
     agent -->|"无待追问；普通请求整批可执行"| tools
     agent -->|"无普通请求或批次预算不足"| research_guard
     tools --> record_results
     record_results --> agent
     request_clarification -->|"用户回答，预算保留"| agent
-    research_guard -->|"有可用证据"| assess_evidence
+    research_guard -->|"历史目标有歧义且有澄清额度"| request_clarification
+    research_guard -->|"历史回顾、未找到或歧义未解"| answer_history
+    answer_history --> history_end
+    research_guard -->|"新研究有可用证据"| assess_evidence
     research_guard -->|"无证据；明确停研、澄清已满或预算耗尽"| finalize_limited_report
     research_guard -->|"无证据；两类额度均未满"| agent
     assess_evidence -->|"clarify，额度未满"| request_clarification
@@ -53,7 +62,7 @@ flowchart TD
     revise_report["修订必须修改项<br/>（revise_report）"]
     finalize_report["定稿并附来源（finalize_report）<br/>limited 加受限提示"]
     finalize_limited_report["失败说明（finalize_limited_report）<br/>不交付未核验草稿；不存记忆"]
-    store_memory["保存或跳过记忆（store_memory）<br/>仅 full、核验通过且非时效性任务写入<br/>limited 不写入"]
+    store_memory["保存或跳过记忆（store_memory）<br/>仅 full、核验通过、无用户材料且非时效性任务写入<br/>limited 不写入"]
     __end__(["结束（__end__）"])
 
     generate_draft --> verify_report
@@ -77,7 +86,7 @@ flowchart TD
 
 绿色实线为 full 正常结束，橙色虚线为 limited 受限报告结束，红色实线为失败说明结束。full 与 limited 共用 `finalize_report → store_memory → END`；双色结束线仅展示结果区别，不是新增路由。limited 经过记忆节点但跳过写入，失败说明不经过记忆节点。
 
-两张图合计覆盖全部 13 个业务节点，衔接节点在两图重复展示。实际只有一个 `__end__`。`__start__`、`__end__` 是 LangGraph 内置节点 ID。图 1 中守卫先检查可用证据，无证据时才检查澄清及研究预算；Agent 侧追问超限只拒绝控制请求，评估侧超限 clarify 则降级为 limited 草稿。
+两张图合计覆盖全部 15 个业务节点，衔接节点在两图重复展示。实际只有一个 `__end__`。`__start__`、`__end__` 是 LangGraph 内置节点 ID。图 1 中守卫先检查可用证据，无证据时才检查澄清及研究预算；Agent 侧追问超限只拒绝控制请求，评估侧超限 clarify 则降级为 limited 草稿。
 
 ## 分支含义与先后顺序
 
@@ -149,11 +158,11 @@ Agent 的无工具协议除 `assess` 外，还接受带非空 `stop_reason` 的 
 | `MAX_TOOL_CALLS` | 8 | 实际研究工具请求计数上限；整批放不下就不执行该批。 |
 | `MAX_CLARIFICATIONS` | 2 | 两入口共用 `len(clarification_history)`，即已完成问答次数。 |
 | `MAX_REPORT_REVISION_ROUNDS` | 2 | 草稿最多受控修订两次；每次修订后再次核验，仍有必须修改项则失败说明。 |
-| `GRAPH_RECURSION_LIMIT` | 40 | 入口传入的图执行步数保护，不是研究轮数或追问次数。 |
+| `GRAPH_RECURSION_LIMIT` | 46 | 入口传入的图执行步数保护，不是研究轮数或追问次数。 |
 
 以上当前值从 `agent/settings.py` 的同名常量核对；实际限制由程序常量决定，不由文档或模型决定。研究预算在轮次或工具次数任一达到上限时耗尽；执行普通工具批次还要求轮次未满，且“已执行工具数 + 本批普通请求数”不超过 `MAX_TOOL_CALLS`。追问、控制回应和因澄清取消的工具不计数。`usable_evidence` 会排除过期或缺少可靠时间的天气记录；原始证据仍保留。
 
-`settings.py` 的递归保护注释按无追问入口或追问恢复入口各 1 步、4 轮各 6 步、报告阶段 4 + 2 × 2 = 8 步核算，最长合法路径为 33 步；加约 20% 余量得到 39.6，取 40。修改研究轮次、修订上限或图结构时必须重新核算。
+`settings.py` 的递归保护注释按无追问入口或追问恢复入口各 1 步、4 轮各 6 步、报告阶段 4 + 2 × 2 = 8 步核算，普通研究路径按 33 步核算。加入历史查询后，最多两次查询各预留查询及再决策两步，另预留一步历史澄清入口，得到 38 步保守上界；加 20% 余量取 46。修改研究轮次、修订上限或图结构时必须重新核算。
 
 Agent 系统上下文传入按常量减当前计数计算的剩余研究轮次、剩余工具调用，最低为零，并说明本批请求不能超过剩余工具次数，否则整批不执行；任一剩余量为零时不要再发起研究工具调用。评估人消息不再传入两行原始计数，而是复用 `research_budget_exhausted` 给出“研究预算：可以继续检索。”或“研究预算：已耗尽，不得选择 continue。”；澄清额度仍单独给出可否追问的状态句。提示词要求评估的 `reason` 不描述预算／额度，程序路由不以该自由解释作判断。
 
