@@ -1621,6 +1621,7 @@ def store_memory_node(state: ResearchState) -> dict[str, list[TraceEntry]]:
         evidence=state.get("evidence", []),
         report_mode=mode,
     )
+    record["run_id"] = state["run_id"]
     save_project_memory(record)
     return {
         "trace": [

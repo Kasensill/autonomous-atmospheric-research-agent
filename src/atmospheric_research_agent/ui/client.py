@@ -60,6 +60,9 @@ class ResearchClient:
     def get(self, run_id: str):
         return self.request('GET',f'/runs/{run_id}')
 
+    def delete(self, run_id: str):
+        return self.request('DELETE', f'/runs/{run_id}')
+
     def answer(self, run_id: str, question_id: str, answer: str):
         return self.request('POST',f'/runs/{run_id}/answers',json={'question_id':question_id,'answer':answer})
 

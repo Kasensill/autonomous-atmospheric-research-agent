@@ -99,7 +99,7 @@ def test_streamlit_continue_button_reopens_checkpoint_question(tmp_path, monkeyp
         remote = ResearchClient(client=client)
         monkeypatch.setattr('atmospheric_research_agent.ui.client.ResearchClient', lambda: remote)
         app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py').run()
-        next(b for b in app.button if b.label.startswith('执行中断 ·')).click().run()
+        app.button(key=f"open_{run_id}").click().run()
         button = next(b for b in app.button if b.label == '继续研究')
         assert not button.disabled
         button.click().run()

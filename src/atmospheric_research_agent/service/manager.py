@@ -17,6 +17,7 @@ from uuid import uuid4
 from ..agent.settings import MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
 from .engine import ResearchSession
 from ..agent.model_trace import model_trace_scope, failure_metadata
+from ..agent.memory import delete_project_memory
 from ..agent.tools.source_reader import source_read_scope
 from ..agent.history import HistoryContext, resolve_archived_history, lookup_summary, _EXPLICIT_RUN_ID
 from ..agent.settings import HISTORY_ARCHIVE_SCAN_LIMIT, HISTORY_TOPIC_REPORT_PREFIX
@@ -502,6 +503,29 @@ class RunManager:
             self._release(record)
             self._touch(record)
             return self._view(record)
+
+    def delete(self, run_id: str) -> dict:
+        with self._lock:
+            self._ensure_open()
+            try:
+                record = self._record(run_id)
+            except ServiceError as error:
+                if error.code != 'run_not_found':
+                    raise
+                return {'run_id': run_id, 'deleted': True}
+            if record.status in {'running', 'waiting_user'} or self._active == run_id:
+                raise ServiceError(409, 'cannot_delete_active', '请先结束或放弃该任务。', run_id)
+            try:
+                # Keep the archive addressable until both derived stores are cleaned.
+                delete_project_memory(run_id)
+                if self._checkpointer is not None:
+                    self._checkpointer.delete_thread(run_id)
+                self._store.delete(run_id)
+            except (OSError, ValueError, sqlite3.Error) as error:
+                LOGGER.warning('run_delete_failed run_id=%s type=%s', run_id, type(error).__name__)
+                raise ServiceError(503, 'delete_failed', '任务清理未完成，请重试。', run_id) from None
+            self._records.pop(run_id, None)
+            return {'run_id': run_id, 'deleted': True}
 
     def result(self, run_id: str) -> dict:
         with self._lock:

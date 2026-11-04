@@ -47,7 +47,7 @@ def test_streamlit_uses_api_preserves_question_and_restores_task(client,monkeypa
     run_id=remote.list_runs()[0]['run_id']
     wait(client,run_id,'waiting_user');app.run()
     assert not app.exception
-    assert any(t.value=='clarify' and t.disabled for t in app.text_area)
+    assert any('当前问题：clarify' in m.value for m in app.markdown)
     key=next(t.key for t in app.text_area if t.label=='你的补充')
     app.text_area(key=key).input('济宁')
     next(b for b in app.button if b.label=='提交回答，继续原任务').click().run()
@@ -56,6 +56,8 @@ def test_streamlit_uses_api_preserves_question_and_restores_task(client,monkeypa
     assert any('本次研究记录' in s.value for s in app.subheader)
     assert any('济宁' in str(m.value) for m in app.markdown)
     restored=AppTest.from_file(app_path,default_timeout=10).run()
-    next(b for b in restored.button if b.label.startswith('completed ·')).click().run()
+    history_item = restored.button(key=f'open_{run_id}')
+    assert history_item.label == 'clarify'
+    history_item.click().run()
     assert not restored.exception
-    assert any(t.value=='clarify' and t.disabled for t in restored.text_area)
+    assert any('当前问题：clarify' in m.value for m in restored.markdown)

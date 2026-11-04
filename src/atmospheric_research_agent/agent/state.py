@@ -118,6 +118,7 @@ class ReportReview(TypedDict, total=False):
 
 
 class ProjectMemoryRecord(TypedDict, total=False):
+    run_id: str
     """跨运行保存的一张研究资料卡，只作背景，不作本轮 evidence。"""
 
     # 这张资料卡自己的唯一 ID；不同于一次运行的 run_id。

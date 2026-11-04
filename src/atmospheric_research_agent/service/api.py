@@ -194,6 +194,10 @@ def create_app(manager: RunManager | None=None, *, db_path: str | Path | None = 
     async def abandon(run_id: UUID, request: Request):
         return request.app.state.manager.abandon(str(run_id))
 
+    @app.delete('/runs/{run_id}')
+    async def delete(run_id: UUID, request: Request):
+        return request.app.state.manager.delete(str(run_id))
+
     @app.get('/runs/{run_id}/result')
     async def result(run_id: UUID, request: Request):
         return request.app.state.manager.result(str(run_id))

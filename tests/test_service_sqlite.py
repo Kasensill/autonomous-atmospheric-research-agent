@@ -27,6 +27,37 @@ class ArchivedSession(FakeSession):
             self.state.update(material_snapshot)
 
 
+def test_delete_cleans_archive_checkpoint_and_only_linked_memory(tmp_path, monkeypatch):
+    from atmospheric_research_agent.agent import memory
+
+    path = tmp_path / 'memory.json'
+    monkeypatch.setattr(memory, 'DEFAULT_MEMORY_PATH', path)
+    db = tmp_path / 'runs.sqlite3'
+    monkeypatch.setattr(engine, 'build_research_graph', fake_graph)
+    manager = RunManager(db_path=db)
+    with MemoryClient(create_app(manager)) as connection:
+        client = ResearchClient(client=connection)
+        run_id = client.create('delete me', 'delete-me')['run_id']
+        wait(connection, run_id, 'completed')
+        assert manager._has_checkpoint(run_id)
+        other = client.create('clarify', 'keep-me')['run_id']
+        wait(connection, other, 'waiting_user')
+        for item in (run_id, other):
+            memory.save_project_memory({'run_id': item, 'question': 'same title'}, store_path=path)
+
+        assert connection.delete(f'/runs/{other}').status_code == 409
+        assert client.delete(run_id)['deleted']
+        assert client.delete(run_id)['deleted']
+        assert connection.get(f'/runs/{run_id}').status_code == 404
+        assert [item['run_id'] for item in client.list_runs()] == [other]
+        assert [item['run_id'] for item in memory.load_project_memory(store_path=path)] == [other]
+    with sqlite3.connect(db.with_suffix('.sqlite3.checkpoints')) as checkpoints:
+        for table in ('checkpoints', 'writes'):
+            assert checkpoints.execute(
+                f'SELECT count(*) FROM {table} WHERE thread_id = ?', (run_id,)
+            ).fetchone()[0] == 0
+
+
 def test_completed_result_trace_and_idempotency_survive_reopen(tmp_path):
     db = tmp_path / 'archive.sqlite3'
     first = RunManager(db_path=db, session_factory=ArchivedSession)
@@ -324,7 +355,7 @@ def test_streamlit_restarted_history_pagination_and_interruption(tmp_path, monke
         monkeypatch.setattr('atmospheric_research_agent.ui.client.ResearchClient', lambda: remote)
         app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py', default_timeout=15).run()
         assert not app.exception
-        next(b for b in app.button if b.label.startswith('执行中断 ·')).click().run()
+        app.button(key=f"open_{waiting['run_id']}").click().run()
         assert not app.exception
         assert any(m.value == '执行中断' for m in app.metric)
         assert next(b for b in app.button if b.label == '继续研究').disabled

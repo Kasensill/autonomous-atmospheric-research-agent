@@ -120,7 +120,7 @@ def test_followup_client_and_page_entry(monkeypatch):
         wait(connection, root['run_id'], 'completed')
         monkeypatch.setattr('atmospheric_research_agent.ui.client.ResearchClient', lambda: remote)
         app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py', default_timeout=10).run()
-        next(b for b in app.button if b.label.startswith('completed ·')).click().run()
+        app.button(key=f"open_{root['run_id']}").click().run()
         assert not app.exception
         next(t for t in app.text_area if t.label == '接下来想研究什么？').input('继续解释')
         next(b for b in app.button if b.label == '继续研究').click().run()
@@ -130,7 +130,7 @@ def test_followup_client_and_page_entry(monkeypatch):
         wait(connection, latest['run_id'], 'completed')
         app.run()
         assert not app.exception
-        assert any(t.value == '继续解释' and t.disabled for t in app.text_area)
+        assert any('当前问题：继续解释' in item.value for item in app.markdown)
 
 
 def test_missing_or_failed_parent_rejected_and_client_contract():

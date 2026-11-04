@@ -6,6 +6,7 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from .state import EvidenceRecord, ProjectMemoryRecord
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MEMORY_PATH = PROJECT_ROOT / "data" / "runtime_memory" / "project_memory.json"
+_memory_write_lock = Lock()
 
 
 def _utc_now() -> str:
@@ -122,8 +124,24 @@ def save_project_memory(
 ) -> None:
     """原子写入记忆文件，避免中途写入留下损坏 JSON。"""
 
-    records = load_project_memory(store_path=store_path)
-    records.append(record)
+    with _memory_write_lock:
+        records = load_project_memory(store_path=store_path)
+        records.append(record)
+        _write_project_memory(records, store_path)
+
+
+def delete_project_memory(run_id: str, *, store_path: Path | None = None) -> int:
+    store_path = store_path if store_path is not None else DEFAULT_MEMORY_PATH
+    with _memory_write_lock:
+        records = load_project_memory(store_path=store_path)
+        remaining = [record for record in records if record.get("run_id") != run_id]
+        removed = len(records) - len(remaining)
+        if removed:
+            _write_project_memory(remaining, store_path)
+        return removed
+
+
+def _write_project_memory(records: list[ProjectMemoryRecord], store_path: Path) -> None:
     store_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = store_path.with_suffix(".tmp")
     temporary_path.write_text(

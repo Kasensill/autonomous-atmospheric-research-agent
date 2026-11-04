@@ -88,6 +88,10 @@ class SQLiteRunStore:
                 conversation_id=excluded.conversation_id, status=excluded.status, payload=excluded.payload''',
                 (record['run_id'], record['key'], record['conversation_id'], record['status'], payload))
 
+    def delete(self, run_id: str) -> None:
+        with self._lock, self._connection:
+            self._connection.execute('DELETE FROM runs WHERE run_id=?', (run_id,))
+
     def _one(self, column: str, value: str) -> dict | None:
         with self._lock:
             row = self._connection.execute(f'SELECT payload FROM runs WHERE {column}=?', (value,)).fetchone()
