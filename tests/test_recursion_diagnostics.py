@@ -1,3 +1,5 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import evidence_nodes as _split_evidence_nodes
 """真实图、mock 模型：仅复现循环并检验诊断，不改变路由或额度。"""
 
 import json
@@ -43,8 +45,8 @@ def setup_loop(monkeypatch, tmp_path, phase):
                 next_step="continue", reason="资料仍不足。",
             )
 
-    monkeypatch.setattr(nodes, "create_research_model", AgentModel)
-    monkeypatch.setattr(nodes, "create_assessment_model", AssessmentModel)
+    monkeypatch.setattr(_split_decision, "create_research_model", AgentModel)
+    monkeypatch.setattr(_split_evidence_nodes, "create_assessment_model", AssessmentModel)
     monkeypatch.setattr(graph_module, "tools_node", lambda _: pytest.fail("不应执行研究工具"))
     monkeypatch.setattr(graph_module, "store_memory_node", lambda _: pytest.fail("不应存记忆"))
     return calls
@@ -113,7 +115,7 @@ def test_debug_writes_started_node_before_unhandled_model_error(monkeypatch, tmp
         def invoke(self, messages):
             raise RuntimeError("offline model failure")
 
-    monkeypatch.setattr(nodes, "create_research_model", BrokenModel)
+    monkeypatch.setattr(_split_decision, "create_research_model", BrokenModel)
     with pytest.raises(RuntimeError, match="offline model failure"):
         run_module.run_research("研究", debug=True)
     path, = tmp_path.rglob("node_trace.jsonl")

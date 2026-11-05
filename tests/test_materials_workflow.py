@@ -1,3 +1,6 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import evidence_nodes as _split_evidence_nodes
+from atmospheric_research_agent.agent import memory_nodes as _split_memory_nodes
 """材料接入现有图：只替换模型/外部 I/O，真实守卫、路由、核验与定稿。"""
 
 from pathlib import Path
@@ -42,13 +45,13 @@ def configure(monkeypatch):
     class Agent:
         def invoke(self, messages):
             return AIMessage(content="无法继续调用研究工具。")
-    monkeypatch.setattr(nodes, "create_research_model", Agent)
-    monkeypatch.setattr(nodes, "create_assessment_model", Assessment)
+    monkeypatch.setattr(_split_decision, "create_research_model", Agent)
+    monkeypatch.setattr(_split_evidence_nodes, "create_assessment_model", Assessment)
     monkeypatch.setattr(graph_module, "generate_draft_node", lambda s: nodes.generate_draft_with_model(s, Writer()))
     monkeypatch.setattr(graph_module, "verify_report_node", lambda s: nodes.verify_report_with_model(s, Reviewer()))
     def forbidden(*args, **kwargs):
         pytest.fail("材料任务不得写入记忆或因材料指令执行工具")
-    monkeypatch.setattr(nodes, "save_project_memory", forbidden)
+    monkeypatch.setattr(_split_memory_nodes, "save_project_memory", forbidden)
     monkeypatch.setattr(graph_module, "tools_node", forbidden)
 
 

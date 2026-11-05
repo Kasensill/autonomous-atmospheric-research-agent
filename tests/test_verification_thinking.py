@@ -1,3 +1,5 @@
+from atmospheric_research_agent.agent import model_factory as _split_model_factory
+from atmospheric_research_agent.agent import report_nodes as _split_report_nodes
 """核验 thinking 实验开关的离线测试；不连接服务端。"""
 
 import json
@@ -12,8 +14,8 @@ from atmospheric_research_agent.agent.state import create_initial_state
 @pytest.fixture
 def clients(monkeypatch):
     created = []
-    monkeypatch.setattr(nodes, "load_dotenv", lambda: None)
-    monkeypatch.setattr(nodes, "model_trace_options", lambda timeout: {})
+    monkeypatch.setattr(_split_model_factory, "load_dotenv", lambda: None)
+    monkeypatch.setattr(_split_model_factory, "model_trace_options", lambda timeout: {})
     monkeypatch.setenv("DEEPSEEK_API_KEY", "offline-placeholder")
     monkeypatch.setenv("RESEARCH_MODEL_PROVIDER", "deepseek")
     monkeypatch.setenv("DEEPSEEK_MODEL", "offline-model")
@@ -32,7 +34,7 @@ def clients(monkeypatch):
             self.structured = (schema, kwargs)
             return self
 
-    monkeypatch.setattr(nodes, "ChatOpenAI", Client)
+    monkeypatch.setattr(_split_model_factory, "ChatOpenAI", Client)
     return created
 
 
@@ -79,7 +81,7 @@ def review_state():
 
 @pytest.mark.parametrize("setting", ["disabled", "enabled"])
 def test_node_trace_records_actual_mode_and_call_duration(monkeypatch, setting):
-    monkeypatch.setattr(nodes, "load_dotenv", lambda: None)
+    monkeypatch.setattr(_split_model_factory, "load_dotenv", lambda: None)
     monkeypatch.setenv("VERIFY_THINKING", setting)
     captured = []
 
@@ -97,8 +99,8 @@ def test_node_trace_records_actual_mode_and_call_duration(monkeypatch, setting):
         return Model()
 
     ticks = iter([10.0, 10.125])
-    monkeypatch.setattr(nodes, "perf_counter", lambda: next(ticks))
-    monkeypatch.setattr(nodes, "create_verification_model", create_model)
+    monkeypatch.setattr(_split_report_nodes, "perf_counter", lambda: next(ticks))
+    monkeypatch.setattr(_split_report_nodes, "create_verification_model", create_model)
     update = nodes.verify_report_node(review_state())
     assert captured == [setting]
     event = next(item for item in update["trace"] if item["event"] == "report_review_completed")

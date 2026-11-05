@@ -1,3 +1,6 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import evidence_nodes as _split_evidence_nodes
+from atmospheric_research_agent.agent import report_nodes as _split_report_nodes
 """复盘缺陷回归：早停协议、澄清边界与证据支持范围，不调用外部 API。"""
 
 import asyncio
@@ -35,7 +38,7 @@ def test_explicit_stop_ends_without_empty_research_rounds(monkeypatch):
                 "decision": "stop", "stop_reason": "用户明确说明地点为虚构，无法核实事件。",
             }, ensure_ascii=False))
 
-    monkeypatch.setattr(nodes, "create_research_model", lambda: Model())
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: Model())
     monkeypatch.setattr(graphs, "recall_memory_node", lambda state: {})
     state = create_initial_state("分析虚构甲市的真实强降水；此地点明确是虚构的。")
     graph = graphs.build_research_graph(checkpointer=InMemorySaver())
@@ -103,11 +106,11 @@ def test_stop_with_evidence_cannot_bypass_report_verification(monkeypatch):
                 unsupported_or_overstated_claims=[], citation_issues=[], required_changes=[], reason="有限结论有引用。")
 
     monkeypatch.setattr(graphs, "recall_memory_node", lambda state: {})
-    monkeypatch.setattr(nodes, "create_research_model", lambda: Agent())
-    monkeypatch.setattr(nodes, "create_assessment_model", lambda: Assessment())
-    monkeypatch.setattr(nodes, "_create_base_model", lambda: Writer())
-    monkeypatch.setattr(nodes, "_verification_thinking", lambda: "disabled")
-    monkeypatch.setattr(nodes, "create_verification_model", lambda **kwargs: Reviewer())
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: Agent())
+    monkeypatch.setattr(_split_evidence_nodes, "create_assessment_model", lambda: Assessment())
+    monkeypatch.setattr(_split_report_nodes, "_create_base_model", lambda: Writer())
+    monkeypatch.setattr(_split_report_nodes, "_verification_thinking", lambda: "disabled")
+    monkeypatch.setattr(_split_report_nodes, "create_verification_model", lambda **kwargs: Reviewer())
     result = graphs.build_research_graph().invoke(evidence_state())
     assert len(reviews) == 1
     assert result["report_mode"] == "limited"

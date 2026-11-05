@@ -1,3 +1,6 @@
+from atmospheric_research_agent.agent import clarification_nodes as _split_clarification_nodes
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import model_factory as _split_model_factory
 import json
 
 import pytest
@@ -45,7 +48,7 @@ def test_deepseek_agent_client_disables_thinking_mode_for_tool_loop(monkeypatch)
             captured_kwargs.update(kwargs)
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
-    monkeypatch.setattr(nodes_module, "ChatOpenAI", FakeChatOpenAI)
+    monkeypatch.setattr(_split_model_factory, "ChatOpenAI", FakeChatOpenAI)
 
     nodes_module._create_base_model()
 
@@ -410,7 +413,7 @@ def test_limited_finalization_withholds_unverified_draft() -> None:
 
 def test_request_clarification_records_answer(monkeypatch) -> None:
     import atmospheric_research_agent.agent.nodes as nodes
-    monkeypatch.setattr(nodes, "interrupt", lambda payload: "北京")
+    monkeypatch.setattr(_split_clarification_nodes, "interrupt", lambda payload: "北京")
     state = create_initial_state("北京现在天气如何？")
     state["clarification_question"] = "请提供你想查询的具体地点。"
 
@@ -483,7 +486,7 @@ def test_agent_node_degrades_empty_no_tool_response_to_guard_path(monkeypatch) -
         def invoke(self, messages):
             return AIMessage(content="")
 
-    monkeypatch.setattr(nodes_module, "create_research_model", lambda: EmptyResponseModel())
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: EmptyResponseModel())
     update = nodes_module.agent_node(create_initial_state("测试空模型响应"))
 
     assert update["trace"][0]["event"] == "empty_no_tool_response"
@@ -497,7 +500,7 @@ def test_agent_node_degrades_invalid_no_tool_response_to_guard_path(monkeypatch)
         def invoke(self, messages):
             return AIMessage(content="我认为证据已经够了。")
 
-    monkeypatch.setattr(nodes_module, "create_research_model", lambda: InvalidResponseModel())
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: InvalidResponseModel())
     update = nodes_module.agent_node(create_initial_state("测试非 JSON 模型响应"))
 
     assert update["trace"][0]["event"] == "invalid_no_tool_response"

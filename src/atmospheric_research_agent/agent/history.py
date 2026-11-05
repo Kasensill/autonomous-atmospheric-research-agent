@@ -173,7 +173,7 @@ class HistoricalAnswer(BaseModel):
 
 
 def _targeted_answer(question: str, record: str) -> str:
-    from .nodes import _create_base_model
+    from .model_factory import _create_base_model
 
     missing = "这条历史记录没有足够信息回答这个问题。"
     try:

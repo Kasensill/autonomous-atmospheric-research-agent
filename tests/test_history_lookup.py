@@ -1,3 +1,6 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import memory_nodes as _split_memory_nodes
+from atmospheric_research_agent.agent import model_factory as _split_model_factory
 """历史查询在真实 SQLite 和研究图上的离线验证。"""
 import json
 from uuid import uuid4
@@ -20,10 +23,10 @@ def model_with(monkeypatch, *decisions):
         def invoke(self, messages):
             return AIMessage(content=json.dumps(next(responses), ensure_ascii=False))
 
-    monkeypatch.setattr(nodes, "create_research_model", Model)
+    monkeypatch.setattr(_split_decision, "create_research_model", Model)
     monkeypatch.setattr("atmospheric_research_agent.agent.history._targeted_answer",
                         lambda question, record: "旧记录显示甲每小时一次、乙每三小时一次。")
-    monkeypatch.setattr(nodes, "recall_project_memory", lambda question: [])
+    monkeypatch.setattr(_split_memory_nodes, "recall_project_memory", lambda question: [])
 
 
 def seed(manager, *, status="completed", mode="limited_report", question="副高采样研究"):
@@ -140,7 +143,7 @@ def test_memory_fallback_is_history_only(tmp_path, monkeypatch):
               "summary": "副高边缘当时被解释为水汽输送路径。", "question": "副高边缘"}
     model_with(monkeypatch, request("answer_history", "topic", value="副高边缘"),
                {"decision": "stop", "stop_reason": "未取得本轮事件资料"})
-    monkeypatch.setattr(nodes, "recall_project_memory", lambda question: [memory])
+    monkeypatch.setattr(_split_memory_nodes, "recall_project_memory", lambda question: [memory])
     with MemoryClient(create_app(db_path=tmp_path / "runs.sqlite3")) as client:
         first = create(client, "以前怎么解释副高边缘？", "history")
         assert wait(client, first, "completed")["delivery_type"] == "history_answer"
@@ -346,7 +349,7 @@ def test_missing_origin_targeted_answer_uses_only_selected_answer(monkeypatch):
             assert payload["record"] == "上次回答说乙站为 10 毫米。长段落不应照贴。"
             return HistoricalAnswer(answer="10 毫米", quotes=["乙站为 10 毫米"])
 
-    monkeypatch.setattr(nodes, "_create_base_model", Model)
+    monkeypatch.setattr(_split_model_factory, "_create_base_model", Model)
     req = request("answer_history")["history_request"]
     result = answer_history_node({
         "question": "上次回答里乙站是多少？只告诉我数字和单位。",
@@ -368,6 +371,6 @@ def test_targeted_answer_rejects_unbacked_number_or_citation(monkeypatch):
         def invoke(self, messages):
             return HistoricalAnswer(answer="10 毫米 [E2]", quotes=["乙站为 110 毫米 [E1]"])
 
-    monkeypatch.setattr(nodes, "_create_base_model", Model)
+    monkeypatch.setattr(_split_model_factory, "_create_base_model", Model)
     result = _targeted_answer("乙站是多少？", "乙站为 110 毫米 [E1]。")
     assert result == "这条历史记录没有足够信息回答这个问题。"

@@ -1,3 +1,4 @@
+from atmospheric_research_agent.agent import memory_nodes as _split_memory_nodes
 import json
 
 import pytest
@@ -67,7 +68,7 @@ def test_verified_report_only_saves_full_and_adds_limited_notice_at_finalize(mon
     if mode == "full":
         assert state["final_report"] == original + "\n\n" + nodes._reference_section(nodes._numbered_evidence(state), report=original)
     path = tmp_path / "memory.json"
-    monkeypatch.setattr(nodes, "save_project_memory", lambda record: save_project_memory(record, store_path=path))
+    monkeypatch.setattr(_split_memory_nodes, "save_project_memory", lambda record: save_project_memory(record, store_path=path))
     event = nodes.store_memory_node(state)["trace"][0]
     if mode == "limited":
         assert event["event"] == "memory_skipped"
@@ -110,7 +111,7 @@ def test_memory_requires_explicit_full_mode(monkeypatch, mode):
     state.update(final_report="已核验正文 [E1]。", report_review={"verdict": "pass"})
     if mode is not None:
         state["report_mode"] = mode
-    monkeypatch.setattr(nodes, "save_project_memory", lambda _: pytest.fail("非 full 不应写入"))
+    monkeypatch.setattr(_split_memory_nodes, "save_project_memory", lambda _: pytest.fail("非 full 不应写入"))
     event = nodes.store_memory_node(state)["trace"][0]
     assert event["event"] == "memory_skipped" and "未明确为 full" in event["detail"]
 
@@ -118,7 +119,7 @@ def test_memory_requires_explicit_full_mode(monkeypatch, mode):
 def test_full_unverified_report_does_not_save_memory(monkeypatch):
     state = state_with_evidence()
     state.update(final_report="未通过的正文", report_mode="full", report_review={"verdict": "revise"})
-    monkeypatch.setattr(nodes, "save_project_memory", lambda _: pytest.fail("未通过核验不应写入"))
+    monkeypatch.setattr(_split_memory_nodes, "save_project_memory", lambda _: pytest.fail("未通过核验不应写入"))
     with pytest.raises(ValueError, match="已通过 Verification"):
         nodes.store_memory_node(state)
 

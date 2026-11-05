@@ -23,7 +23,9 @@ from langchain_core.tools import StructuredTool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from ..agent import evidence as evidence_module, nodes
+from ..agent import clarification_nodes, decision, evidence as evidence_module, history
+from ..agent import memory_nodes, node_shared, report_nodes, tool_nodes
+from ..agent import model_factory as model_factory_module
 from ..agent.graph import build_research_graph
 from ..agent.memory import recall_project_memory, save_project_memory
 from ..agent.settings import GRAPH_RECURSION_LIMIT, MAX_CLARIFICATIONS, MAX_RESEARCH_ROUNDS, MAX_TOOL_CALLS
@@ -59,7 +61,7 @@ def controlled_model(factory, recorder, **kwargs):
     if model.model_name != "deepseek-flash" or str(model.openai_api_base).rstrip("/") != "https://api.deepseek.com":
         raise BudgetStop("当前预算仅核对了官方deepseek-flash，模型或端点变化需重新估价")
     # 重新构造客户端：model_copy修改字段不会重建已初始化的HTTP客户端。
-    return nodes.ChatOpenAI(model=model.model_name, api_key=model.openai_api_key,
+    return model_factory_module.ChatOpenAI(model=model.model_name, api_key=model.openai_api_key,
                             base_url=model.openai_api_base, temperature=model.temperature,
                             extra_body=model.extra_body, callbacks=[recorder],
                             max_retries=0, timeout=60, max_tokens=4096)
@@ -218,7 +220,7 @@ def objective_checks(state: dict, case: dict) -> dict:
     }
     if any(t.get("event") == "report_finalized" for t in state.get("trace", [])):
         checks["verification_pass"] = state.get("report_review", {}).get("verdict") == "pass"
-        checks["citations_exist"] = not nodes.check_citation_integrity(state)
+        checks["citations_exist"] = not report_nodes.check_citation_integrity(state)
     messages = state.get("messages", [])
     requested = [call for m in messages for call in getattr(m, "tool_calls", [])]
     answers = [getattr(m, "tool_call_id", None) for m in messages if m.type == "tool"]
@@ -261,7 +263,7 @@ def run_case(case: dict, mode: str, attempt_id: str, output: Path, clock: str, r
               "runner_sha256": sha256(Path(__file__).read_bytes()).hexdigest()}
     append_json(output / "runs.jsonl", result)
     memory_path = directory / "isolated_memory.json"
-    original_factory = nodes._create_base_model
+    original_factory = model_factory_module._create_base_model
     frozen_now = datetime.fromisoformat(clock)
 
     def model_factory(**kwargs):
@@ -269,15 +271,22 @@ def run_case(case: dict, mode: str, attempt_id: str, output: Path, clock: str, r
 
     try:
         with ExitStack() as stack:
-            stack.enter_context(patch.object(nodes, "_create_base_model", model_factory))
-            stack.enter_context(patch.object(nodes, "recall_project_memory", lambda question: recall_project_memory(question, store_path=memory_path)))
-            stack.enter_context(patch.object(nodes, "save_project_memory", lambda record: save_project_memory(record, store_path=memory_path)))
+            stack.enter_context(patch.object(model_factory_module, "_create_base_model", model_factory))
+            stack.enter_context(patch.object(report_nodes, "_create_base_model", model_factory))
+            stack.enter_context(patch.object(memory_nodes, "recall_project_memory", lambda question: recall_project_memory(question, store_path=memory_path)))
+            stack.enter_context(patch.object(memory_nodes, "save_project_memory", lambda record: save_project_memory(record, store_path=memory_path)))
             if mode == "frozen":
-                stack.enter_context(patch.object(nodes, "RESEARCH_TOOLS", frozen_tools(case, clock)))
+                tools = frozen_tools(case, clock)
+                stack.enter_context(patch.object(model_factory_module, "RESEARCH_TOOLS", tools))
+                stack.enter_context(patch.object(tool_nodes, "RESEARCH_TOOLS", tools))
                 original_stale = evidence_module.is_stale_weather
                 stale = lambda record, **kw: original_stale(record, now=frozen_now)
                 stack.enter_context(patch.object(evidence_module, "is_stale_weather", stale))
-                stack.enter_context(patch.object(nodes, "is_stale_weather", stale))
+                stack.enter_context(patch.object(report_nodes, "is_stale_weather", stale))
+                stack.enter_context(patch.object(node_shared, "is_stale_weather", stale))
+                stack.enter_context(patch.object(decision, "is_stale_weather", stale))
+                stack.enter_context(patch.object(clarification_nodes, "is_stale_weather", stale))
+                stack.enter_context(patch.object(history, "is_stale_weather", stale))
             graph = build_research_graph(checkpointer=InMemorySaver())
             state = graph.invoke(state, config)
             answers = iter(case.get("answers", []))
@@ -355,7 +364,7 @@ def main():
 
 def run_judges(output: Path, recorder: ModelRecorder, cases_path: Path | None = None):
     """保留原始模型审查和程序合并审查，避免把复合结果误称纯模型能力。"""
-    original_factory = nodes._create_base_model
+    original_factory = model_factory_module._create_base_model
     results = []
     errors = 0
     for case in load_report_verification_cases(cases_path or output / "verification_cases.json"):
@@ -372,7 +381,7 @@ def run_judges(output: Path, recorder: ModelRecorder, cases_path: Path | None = 
                   "runner_sha256": sha256(Path(__file__).read_bytes()).hexdigest()}
         try:
             model = controlled_model(original_factory, recorder)
-            structured = model.with_structured_output(nodes.ReportReviewOutput, method="json_mode")
+            structured = model.with_structured_output(model_factory_module.ReportReviewOutput, method="json_mode")
             captured = {}
 
             class Capture:
@@ -381,10 +390,10 @@ def run_judges(output: Path, recorder: ModelRecorder, cases_path: Path | None = 
                     captured.update(answer.model_dump())
                     return answer
 
-            update = nodes.verify_report_with_model(state, Capture())
+            update = report_nodes.verify_report_with_model(state, Capture())
             result.update(status="COMPLETED", raw_model_review=captured, composite_review=update["report_review"],
                           matched=update["report_review"]["verdict"] == case.expected_verdict,
-                          program_citation_issues=nodes.check_citation_integrity(state))
+                          program_citation_issues=report_nodes.check_citation_integrity(state))
             errors = 0
         except Exception as error:
             result.update(status="ERROR", error_type=type(error).__name__, error=str(error)[:2000])

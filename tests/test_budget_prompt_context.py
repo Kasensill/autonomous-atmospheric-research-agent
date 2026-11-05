@@ -1,3 +1,5 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import evidence_nodes as _split_evidence_nodes
 from copy import deepcopy
 
 import pytest
@@ -38,7 +40,7 @@ def test_assessment_reuses_budget_helper(monkeypatch, exhausted):
         seen.append(received)
         return exhausted
 
-    monkeypatch.setattr(nodes, "research_budget_exhausted", budget_check)
+    monkeypatch.setattr(_split_evidence_nodes, "research_budget_exhausted", budget_check)
     content = nodes._assessment_messages(state)[1].content
     assert seen == [state]
     assert ("研究预算：已耗尽，不得选择 continue。" if exhausted
@@ -56,7 +58,7 @@ def test_agent_receives_remaining_budget_and_batch_rule(rounds, calls):
     state = create_initial_state("研究")
     state.update(research_round=rounds, tool_call_count=calls)
     before = deepcopy(state)
-    content = nodes._messages_for_model(state)[1].content
+    content = "\n".join(message.content for message in nodes._messages_for_model(state))
     remaining_rounds = max(0, MAX_RESEARCH_ROUNDS - rounds)
     remaining_tools = max(0, MAX_TOOL_CALLS - calls)
     assert f"剩余研究轮次 {remaining_rounds}，剩余工具调用 {remaining_tools}。" in content
@@ -68,11 +70,12 @@ def test_agent_receives_remaining_budget_and_batch_rule(rounds, calls):
 
 
 def test_agent_remaining_budget_uses_constants(monkeypatch):
-    monkeypatch.setattr(nodes, "MAX_RESEARCH_ROUNDS", 11)
-    monkeypatch.setattr(nodes, "MAX_TOOL_CALLS", 19)
+    monkeypatch.setattr(_split_decision, "MAX_RESEARCH_ROUNDS", 11)
+    monkeypatch.setattr(_split_decision, "MAX_TOOL_CALLS", 19)
     state = create_initial_state("研究")
     state.update(research_round=2, tool_call_count=3)
-    assert "剩余研究轮次 9，剩余工具调用 16。" in nodes._messages_for_model(state)[1].content
+    assert any("剩余研究轮次 9，剩余工具调用 16。" in message.content
+               for message in nodes._messages_for_model(state))
 
 
 def test_brevity_rule_applies_only_to_limited_report():

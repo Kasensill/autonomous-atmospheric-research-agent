@@ -1,3 +1,6 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import model_factory as _split_model_factory
+from atmospheric_research_agent.agent import tool_nodes as _split_tool_nodes
 """专用澄清控制声明、消息配对、共享上限与真实图暂停恢复的离线回归。"""
 
 import json
@@ -72,7 +75,7 @@ def test_ask_user_is_bound_but_not_registered_for_execution(monkeypatch):
             return self
 
     model = BindingModel()
-    monkeypatch.setattr(nodes, "_create_base_model", lambda: model)
+    monkeypatch.setattr(_split_model_factory, "_create_base_model", lambda: model)
     assert nodes.create_research_model() is model
     assert "ask_user" not in {tool.name for tool in nodes.RESEARCH_TOOLS}
 
@@ -81,7 +84,7 @@ def test_multiple_asks_cancel_research_and_have_closed_protocol_before_pause(mon
     state = create_initial_state("天气")
     state.update(research_round=MAX_RESEARCH_ROUNDS, tool_call_count=8)
     model = SequenceModel([AIMessage(content="", tool_calls=[ask(), search(), ask("ask2", "哪一年？")])])
-    monkeypatch.setattr(nodes, "create_research_model", lambda: model)
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: model)
     update = nodes.agent_node(state)
     assert "research_round" not in update and "tool_call_count" not in update and "evidence" not in update
     apply_update(state, update)
@@ -105,7 +108,7 @@ def test_invalid_ask_preserves_research_and_never_pauses(monkeypatch, question, 
     state["research_round"] = 0 if budget_available else MAX_RESEARCH_ROUNDS
     calls = [ask(question=question), *([search()] if with_research else [])]
     model = SequenceModel([AIMessage(content="", tool_calls=calls)])
-    monkeypatch.setattr(nodes, "create_research_model", lambda: model)
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: model)
     update = nodes.agent_node(state)
     apply_update(state, update)
     assert state["clarification_question"] is None
@@ -113,7 +116,7 @@ def test_invalid_ask_preserves_research_and_never_pauses(monkeypatch, question, 
     if with_research and budget_available:
         assert len([m for m in update["messages"] if isinstance(m, ToolMessage)]) == 1
         # 使用空注册表使普通工具得到安全错误回应，不调用真实服务。
-        monkeypatch.setattr(nodes, "RESEARCH_TOOLS", [])
+        monkeypatch.setattr(_split_tool_nodes, "RESEARCH_TOOLS", [])
         apply_update(state, nodes.tools_node(state))
     assert_protocol_closed(state["messages"])
     assert any(e["event"] == "invalid_clarification_request" for e in update["trace"])
@@ -132,7 +135,7 @@ def test_final_graph_messages_have_exactly_one_response_per_call_id(monkeypatch,
         executed.append(query)
         return {"status": "success", "results": []}
 
-    monkeypatch.setattr(nodes, "RESEARCH_TOOLS", [search_local_knowledge])
+    monkeypatch.setattr(_split_tool_nodes, "RESEARCH_TOOLS", [search_local_knowledge])
     graph = setup_real_graph(monkeypatch, model)
     state = create_initial_state("研究")
     state["evidence"] = evidence()
@@ -181,7 +184,7 @@ def test_limit_rejects_only_ask_and_uses_normal_batch_budget(monkeypatch, batch,
     state = create_initial_state("研究")
     state.update(clarification_history=history(), research_round=MAX_RESEARCH_ROUNDS - 1, tool_call_count=7)
     response = AIMessage(content="", tool_calls=[ask(), *[search(str(i)) for i in range(batch)]])
-    monkeypatch.setattr(nodes, "create_research_model", lambda: SequenceModel([response]))
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: SequenceModel([response]))
     update = graph_module._instrument_node("agent", nodes.agent_node)(state)
     apply_update(state, update)
     assert nodes.route_after_agent(state) == expected
@@ -202,7 +205,7 @@ def test_limit_without_evidence_fails_without_spending_rounds(monkeypatch, round
     state = create_initial_state("研究")
     state.update(clarification_history=history(), research_round=rounds, tool_call_count=count)
     model = SequenceModel([AIMessage(content="", tool_calls=[ask()])])
-    monkeypatch.setattr(nodes, "create_research_model", lambda: model)
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: model)
     apply_update(state, nodes.agent_node(state))
     apply_update(state, graph_module._instrument_node("research_guard", nodes.research_guard_node)(state))
     assert nodes.route_after_research_guard(state) == "finalize_limited_report"
@@ -226,7 +229,7 @@ class ClarifyingAssessment:
 def test_assessment_shares_limit_and_converts_clarify_to_limited_report():
     state = create_initial_state("研究")
     state.update(clarification_history=history(), evidence=evidence())
-    assert "不可再追问" in nodes._messages_for_model(state)[1].content
+    assert any("不可再追问" in message.content for message in nodes._messages_for_model(state))
     update = nodes.assess_evidence_with_model(state, ClarifyingAssessment())
     assert update["clarification_question"] is None
     assert update["assessment"]["next_step"] == "limited_report"
@@ -244,7 +247,7 @@ def test_model_obeying_no_more_questions_still_exits_without_empty_round(monkeyp
     state = create_initial_state("研究")
     state["clarification_history"] = history()
     model = SequenceModel([AIMessage(content='{"decision":"assess","plan_update":{}}')])
-    monkeypatch.setattr(nodes, "create_research_model", lambda: model)
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: model)
     apply_update(state, nodes.agent_node(state))
     apply_update(state, nodes.research_guard_node(state))
     assert nodes.route_after_research_guard(state) == "finalize_limited_report"
@@ -254,7 +257,7 @@ def test_model_obeying_no_more_questions_still_exits_without_empty_round(monkeyp
 
 
 def setup_real_graph(monkeypatch, model):
-    monkeypatch.setattr(nodes, "create_research_model", lambda: model)
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: model)
     monkeypatch.setattr(graph_module, "recall_memory_node", lambda _: {})
     monkeypatch.setattr(graph_module, "assess_evidence_node", lambda _: {
         "assessment": {"sufficient": True, "next_step": "full_report"}})
@@ -302,7 +305,7 @@ def test_two_real_pauses_then_limit_keeps_normal_research_call(monkeypatch):
         return {"status": "success", "results": [{"content": "下沉运动抑制云雨。",
                 "source": {"location": "new.md", "display_name": "内部资料"}}]}
 
-    monkeypatch.setattr(nodes, "RESEARCH_TOOLS", [search_local_knowledge])
+    monkeypatch.setattr(_split_tool_nodes, "RESEARCH_TOOLS", [search_local_knowledge])
     graph = setup_real_graph(monkeypatch, model)
     state = create_initial_state("研究")
     config = {"configurable": {"thread_id": state["run_id"]}}
@@ -361,8 +364,8 @@ def test_control_responses_do_not_consume_an_extra_tool_slot_after_limit(monkeyp
         """不联网的空研究结果。"""
         return {"status": "success", "results": []}
 
-    monkeypatch.setattr(nodes, "RESEARCH_TOOLS", [search_local_knowledge])
-    monkeypatch.setattr(nodes, "create_research_model", lambda: model)
+    monkeypatch.setattr(_split_tool_nodes, "RESEARCH_TOOLS", [search_local_knowledge])
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: model)
     apply_update(state, nodes.agent_node(state))
     apply_update(state, nodes.tools_node(state))
     apply_update(state, nodes.record_results_node(state))

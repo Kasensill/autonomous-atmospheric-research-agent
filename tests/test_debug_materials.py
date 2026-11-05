@@ -1,3 +1,4 @@
+from atmospheric_research_agent.agent import decision as _split_decision
 """诊断材料来自真实图检查点；模型、工具和长期记忆均离线替换。"""
 
 import json
@@ -127,7 +128,7 @@ def test_missing_ignore_confirmation_stops_before_model_or_files(monkeypatch, tm
         return SimpleNamespace(returncode=1)
 
     monkeypatch.setattr(run_module.subprocess, "run", not_ignored)
-    monkeypatch.setattr(nodes, "create_research_model", lambda: pytest.fail("忽略检查失败后不能调用模型"))
+    monkeypatch.setattr(_split_decision, "create_research_model", lambda: pytest.fail("忽略检查失败后不能调用模型"))
     with pytest.raises(RuntimeError, match="未确认被 Git 忽略"):
         run_module.run_research("研究", debug=True)
     assert commands[0][0][:4] == ["git", "check-ignore", "--quiet", "--no-index"]
@@ -145,7 +146,7 @@ def test_question_is_in_trace_only_for_ask_user_and_is_truncated(monkeypatch):
                 {"id": "b", "name": "search_local_knowledge", "args": {"query": "查" * 550, "question": "不应记录"}},
             ])
 
-    monkeypatch.setattr(nodes, "create_research_model", Model)
+    monkeypatch.setattr(_split_decision, "create_research_model", Model)
     update = nodes.agent_node(run_module.create_initial_state("研究"))
     event = next(item for item in update["trace"] if item["event"] == "model_response")
     assert event["tool_calls"][0]["args"] == {"question": "问" * 200}

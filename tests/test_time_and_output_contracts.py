@@ -1,3 +1,4 @@
+from atmospheric_research_agent.agent import report_nodes as _split_report_nodes
 """P20/P22/超长输入的回归：时钟、失效原因和显式单句格式。"""
 
 import pytest
@@ -174,9 +175,9 @@ def test_program_forces_single_sentence_revision_even_when_model_passes(monkeypa
     monkeypatch.setattr(graphs, "recall_memory_node", lambda s: {})
     monkeypatch.setattr(graphs, "agent_node", lambda s: {"messages": [AIMessage(content='{"decision":"assess"}')]})
     monkeypatch.setattr(graphs, "assess_evidence_node", lambda s: {"assessment": {"sufficient": True, "next_step": "full_report"}})
-    monkeypatch.setattr(nodes, "_create_base_model", lambda: Writer())
-    monkeypatch.setattr(nodes, "create_verification_model", lambda **kw: Reviewer())
-    monkeypatch.setattr(nodes, "_verification_thinking", lambda: "disabled")
+    monkeypatch.setattr(_split_report_nodes, "_create_base_model", lambda: Writer())
+    monkeypatch.setattr(_split_report_nodes, "create_verification_model", lambda **kw: Reviewer())
+    monkeypatch.setattr(_split_report_nodes, "_verification_thinking", lambda: "disabled")
     monkeypatch.setattr(graphs, "store_memory_node", lambda s: {})
     result = graphs.build_research_graph().invoke(state)
     assert result["report_revision_count"] == 1

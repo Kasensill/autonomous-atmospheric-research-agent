@@ -227,7 +227,15 @@ src/atmospheric_research_agent/
   agent/
     state.py                       # ResearchState：图中的共享公共契约
     settings.py                    # 预算、Top-K、超时等集中运行配置
-    nodes.py                       # Agent、工具、证据、评估、报告节点
+    nodes.py                       # 原节点导入路径的兼容入口
+    model_factory.py               # 模型配置与结构化输出
+    decision.py                    # Agent 决策和路由
+    tool_nodes.py                  # 工具执行与结果整理
+    evidence_nodes.py              # 证据守卫与充分性评估
+    report_nodes.py                # 草稿、核验、修订与交付
+    memory_nodes.py                # 记忆召回与写入节点
+    node_shared.py                 # 跨节点共用的消息和证据处理
+    clarification_nodes.py         # 人工澄清节点
     graph.py                       # 节点和边组成的 LangGraph
     run.py                         # 命令行入口
     tools/                         # 四个实际工具

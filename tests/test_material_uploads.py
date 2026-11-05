@@ -1,3 +1,6 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import evidence_nodes as _split_evidence_nodes
+from atmospheric_research_agent.agent import memory_nodes as _split_memory_nodes
 """上传→任务→HITL恢复→报告：真实程序链路，模型替身，不调用外部 API。"""
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
@@ -43,12 +46,12 @@ def uploaded_service(tmp_path, monkeypatch):
     def forbidden(*args, **kwargs):
         pytest.fail('材料任务不应执行研究工具或写长期记忆')
     monkeypatch.setattr(graph_module, 'recall_memory_node', lambda _: {})
-    monkeypatch.setattr(nodes, 'create_research_model', Agent)
-    monkeypatch.setattr(nodes, 'create_assessment_model', Assessment)
+    monkeypatch.setattr(_split_decision, 'create_research_model', Agent)
+    monkeypatch.setattr(_split_evidence_nodes, 'create_assessment_model', Assessment)
     monkeypatch.setattr(graph_module, 'generate_draft_node', lambda s: nodes.generate_draft_with_model(s, Writer()))
     monkeypatch.setattr(graph_module, 'verify_report_node', lambda s: nodes.verify_report_with_model(s, Reviewer()))
     monkeypatch.setattr(graph_module, 'tools_node', forbidden)
-    monkeypatch.setattr(nodes, 'save_project_memory', forbidden)
+    monkeypatch.setattr(_split_memory_nodes, 'save_project_memory', forbidden)
     calls = []
     original = materials.load_materials
     def counted(paths, *args, **kwargs):

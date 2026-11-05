@@ -57,7 +57,7 @@ def test_unlabelled_is_not_automatically_noise_and_rank_not_compressed():
 def test_agent_input_contains_assessment_feedback():
     state = create_initial_state("研究")
     state["assessment"] = {"missing_points": ["需要低层水汽输送证据"]}
-    assert "需要低层水汽输送证据" in nodes._messages_for_model(state)[1].content
+    assert any("需要低层水汽输送证据" in message.content for message in nodes._messages_for_model(state))
 
 
 def test_program_budget_reason_is_not_model_inference():

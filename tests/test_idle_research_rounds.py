@@ -1,3 +1,5 @@
+from atmospheric_research_agent.agent import decision as _split_decision
+from atmospheric_research_agent.agent import evidence_nodes as _split_evidence_nodes
 """研究续行空转与恢复后步数的离线回归；不调用外部模型或工具。"""
 
 import json
@@ -82,8 +84,8 @@ def configure_graph(monkeypatch, *, tool_rounds, response="valid", assess_each_b
 
     assessment = ContinueModel()
     reviewer = Reviewer()
-    monkeypatch.setattr(nodes, "create_research_model", Agent)
-    monkeypatch.setattr(nodes, "create_assessment_model", lambda: assessment)
+    monkeypatch.setattr(_split_decision, "create_research_model", Agent)
+    monkeypatch.setattr(_split_evidence_nodes, "create_assessment_model", lambda: assessment)
     monkeypatch.setattr(graph_module, "tools_node", tools)
     monkeypatch.setattr(graph_module, "generate_draft_node", lambda s: nodes.generate_draft_with_model(s, Writer()))
     monkeypatch.setattr(graph_module, "verify_report_node", lambda s: nodes.verify_report_with_model(s, reviewer))

@@ -1,3 +1,4 @@
+from atmospheric_research_agent.agent import decision as _split_decision
 import json
 
 from langchain_core.messages import AIMessage
@@ -14,7 +15,7 @@ def test_plan_round_is_recorded_by_program_without_changing_model_protocol(monke
                 "plan_update": {"goal": "研究下沉运动"},
             }, ensure_ascii=False))
 
-    monkeypatch.setattr(nodes, "create_research_model", Model)
+    monkeypatch.setattr(_split_decision, "create_research_model", Model)
     state = create_initial_state("研究")
     state["research_round"] = 1
     state.update(nodes.agent_node(state))

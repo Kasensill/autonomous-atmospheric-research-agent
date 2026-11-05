@@ -1,3 +1,4 @@
+from atmospheric_research_agent.agent import memory_nodes as _split_memory_nodes
 """外部审查发现的数据丢失、来源与记忆策略的行为回归。"""
 
 from langchain_core.messages import AIMessage, ToolMessage
@@ -77,7 +78,7 @@ def test_brief_report_cannot_pass_length_rule_even_if_model_passes():
 def test_weather_reports_skip_memory(monkeypatch):
     def unexpected(record):
         raise AssertionError("不应写入")
-    monkeypatch.setattr(nodes, "save_project_memory", unexpected)
+    monkeypatch.setattr(_split_memory_nodes, "save_project_memory", unexpected)
     for question, evidence, assessment in [
         ("当前天气", [], {"sufficient": True, "next_step": "full_report"}),
         ("机制", [{"source_type": "weather"}], {"sufficient": True, "next_step": "full_report"}),
@@ -98,7 +99,7 @@ def test_legacy_weather_memory_not_recalled_and_file_is_preserved(tmp_path):
 
 def test_verified_full_non_weather_report_still_writes_memory(monkeypatch):
     saved = []
-    monkeypatch.setattr(nodes, "save_project_memory", saved.append)
+    monkeypatch.setattr(_split_memory_nodes, "save_project_memory", saved.append)
     state = create_initial_state("副高机制")
     state.update(final_report="下沉抑制云雨", report_mode="full", report_review={"verdict": "pass"},
                  assessment={"sufficient": True, "next_step": "full_report"})
