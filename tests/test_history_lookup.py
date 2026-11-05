@@ -374,3 +374,44 @@ def test_targeted_answer_rejects_unbacked_number_or_citation(monkeypatch):
     monkeypatch.setattr(_split_model_factory, "_create_base_model", Model)
     result = _targeted_answer("乙站是多少？", "乙站为 110 毫米 [E1]。")
     assert result == "这条历史记录没有足够信息回答这个问题。"
+
+
+@pytest.mark.parametrize(("answer", "quote", "accepted"), [
+    ("3小时", "乙站每三小时采样一次", True),
+    ("三小时", "乙站每3小时采样一次", True),
+    ("13小时", "乙站每十三小时采样一次", True),
+    ("-3℃", "温度为负三℃", True),
+    ("4小时", "乙站每三小时采样一次", False),
+    ("四小时", "乙站每三小时采样一次", False),
+    ("3小时", "乙站每十三小时采样一次", False),
+    ("3分钟", "乙站每三小时采样一次", False),
+    ("3毫米/小时", "降水量为3毫米", False),
+    ("三百小时", "乙站每三小时采样一次", False),
+])
+def test_targeted_answer_quantity_requires_equivalent_quoted_value(monkeypatch, answer, quote, accepted):
+    from atmospheric_research_agent.agent.history import HistoricalAnswer, _targeted_answer
+
+    class Model:
+        def with_structured_output(self, schema, **kwargs):
+            return self
+
+        def invoke(self, messages):
+            return HistoricalAnswer(answer=answer, quotes=[quote])
+
+    monkeypatch.setattr(_split_model_factory, "_create_base_model", Model)
+    result = _targeted_answer("是多少？", quote)
+    assert (result == answer) is accepted
+
+
+def test_targeted_answer_does_not_join_separate_quotes_into_quantity(monkeypatch):
+    from atmospheric_research_agent.agent.history import HistoricalAnswer, _targeted_answer
+
+    class Model:
+        def with_structured_output(self, schema, **kwargs):
+            return self
+
+        def invoke(self, messages):
+            return HistoricalAnswer(answer="3小时", quotes=["3", "小时"])
+
+    monkeypatch.setattr(_split_model_factory, "_create_base_model", Model)
+    assert _targeted_answer("多久？", "次数为3，时间单位为小时。") == "这条历史记录没有足够信息回答这个问题。"

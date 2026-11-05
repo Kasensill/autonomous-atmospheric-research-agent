@@ -172,6 +172,34 @@ class HistoricalAnswer(BaseModel):
     quotes: list[str] = Field(default_factory=list, max_length=8)
 
 
+_QUANTITY_PATTERN = re.compile(
+    r"(?<![0-9.零〇一二两三四五六七八九十百千万亿])"
+    r"(?P<number>[+\-−负]?(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿点]+))"
+    r"\s*(?P<unit>毫米/小时|mm/h|毫米|厘米|千米|小时|分钟|秒|℃|%|hPa|mm|km|m/s)"
+    r"(?!\s*[/／])"
+)
+_CHINESE_DIGITS = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
+                   "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+
+
+def _quantities(text: str) -> set[tuple[str, str]] | None:
+    values = set()
+    for match in _QUANTITY_PATTERN.finditer(text):
+        number = match.group("number").replace("−", "-").replace("负", "-")
+        sign = "-" if number.startswith("-") else ""
+        unsigned = number.lstrip("+-")
+        if re.fullmatch(r"[一二两三四五六七八九]?十[一二三四五六七八九]?", unsigned):
+            tens, ones = unsigned.split("十")
+            number = sign + str((_CHINESE_DIGITS[tens] if tens else 1) * 10
+                                + (_CHINESE_DIGITS[ones] if ones else 0))
+        elif unsigned in _CHINESE_DIGITS:
+            number = sign + str(_CHINESE_DIGITS[unsigned])
+        elif not re.fullmatch(r"\d+(?:\.\d+)?", unsigned):
+            return None
+        values.add((number, match.group("unit")))
+    return values
+
+
 def _targeted_answer(question: str, record: str) -> str:
     from .model_factory import _create_base_model
 
@@ -202,12 +230,11 @@ def _targeted_answer(question: str, record: str) -> str:
     if not cited.issubset(set(re.findall(r"\[E\d+\]", " ".join(quotes)))):
         return missing
     # 核对相邻数字和常见单位，避免把记录中分散出现的值与单位重新拼接。
-    quantity_pattern = re.compile(
-        r"(?<![0-9.])[+\-−]?\d+(?:\.\d+)?\s*(?:毫米|厘米|千米|小时|分钟|秒|℃|%|hPa|mm(?:/h)?|km|m/s)",
-    )
-    def quantities(text: str) -> set[str]:
-        return {re.sub(r"\s+", "", value) for value in quantity_pattern.findall(text)}
-    if not quantities(answer).issubset(quantities(" ".join(quotes))):
+    answer_quantities = _quantities(answer)
+    quote_quantities = [_quantities(quote) for quote in quotes]
+    if answer_quantities is None or any(items is None for items in quote_quantities):
+        return missing
+    if not answer_quantities.issubset(set().union(*quote_quantities)):
         return missing
     return answer
 
